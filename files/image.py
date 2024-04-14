@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import QLineEdit, QPushButton
 from PyQt6.QtGui import QMouseEvent, QPixmap, QPainter, QPen, QColor, QIntValidator
 from PyQt6.QtCore import Qt, QDir, QPoint
 from tifConv import tiffIm
+from energyVmomentum import EnergyVMomentum
 from PIL import Image, ImageQt
 import numpy as np
 import os, sys
@@ -24,6 +25,7 @@ class ARPESGUI(QMainWindow):
     def __init__(self):
         super().__init__()
         QGraphicsView.__init__(self, parent=None)
+        #self.setMouseTracking(True)
 
         self.setWindowTitle("DeLTA Lab ARPES GUI")
         #self.setGeometry(100, 100, 800, 600)
@@ -52,19 +54,24 @@ class ARPESGUI(QMainWindow):
 
     #setup the basic ui elements
     def setup_ui(self, layoutCol1, layoutCol2, layoutCol2Col1, layoutCol2Row1, layoutCol2Row2):
+        '''
         self.dir_path = self.getFolder()
         if not os.path.exists(self.dir_path):
             print("not a valid directory")
             sys.exit()
+            '''
+        #while testing:
+        self.dir_path = '/Users/alexpoulin/Downloads/ARPES/ARPES/For_Alex/Sum'
+    
             
         tif = []
         for f in os.listdir(self.dir_path):
             if f.endswith('.TIF'):
                 tif.append(f)
             if f.endswith('.DAT'):
-                dat = f
-        #print("files" + str(os.listdir(self.dir_path))  ) 
-        #print("tif" + str(sorted(tif)))
+                self.dat = f
+            if f.endswith('.txt'):
+                self.energies = f
         tif = sorted(tif)
         self.tifArr = tiffIm(self.dir_path, tif)
         
@@ -74,11 +81,6 @@ class ARPESGUI(QMainWindow):
         self.image_label = QLabel("Tif Image Placeholder")
         #if len(tif) > 0: blah blah blah
         
-        #print(self.dir_path + "/" + tif[0])
-        #pixmap = QPixmap(self.dir_path + "/" + tif[0])  # Set your image path here  #this is to get image via dir path
-        #self.image_label.setScaledContents(True)
-        
-        #print(self.tifArr[0])
         self.im = Image.fromarray(self.tifArr[0])
         self.pixmap = QPixmap.fromImage(ImageQt.ImageQt(self.im)) #set image based on numpy array
         
@@ -185,7 +187,6 @@ class ARPESGUI(QMainWindow):
 
     #allow drag
     def mouseMoveEvent(self, e):
-        #print("mouse release")
         #print(e.pos().x() - self.image_label.x()) //this is the true position with respect to the picture
         if (e.pos().x() - self.image_label.x() < 0 or e.pos().x() - self.image_label.x() > self.image_label.width() or e.pos().y() - self.image_label.y() < 0 or e.pos().y() - self.image_label.y() > self.image_label.height()):
             return #return if not in bounds
@@ -195,10 +196,6 @@ class ARPESGUI(QMainWindow):
             self.last_x = pos.x()
             self.last_y = pos.y()
             return # Ignore the first time.
-        #if self.startx < int(self.image_label.x()) and self.startx > int(self.image_label.x()) + int(self.image_label.width() and self.starty < int(self.image_label.y()) and self.starty > int(self.image_label.y()) + int(self.image_label.height())):
-            #not in bounds
-        #    return
-        #else:
         #later to keep the image from being redrawn gonna have to draw on a new pixmap, overlay, and save the drawing
         self.image_label.setPixmap(QPixmap.fromImage(ImageQt.ImageQt(self.im)))
         
@@ -216,9 +213,6 @@ class ARPESGUI(QMainWindow):
         painter.setPen(pen)
         painter.device()
         
-        #below is to draw a finite line
-        #painter.drawLine(int(self.startx), int(self.starty), int(pos.x() - self.image_label.x()), int(pos.y() - self.image_label.y()))
-        
         if ((pos.x() - self.image_label.x()) - self.startx) == 0:
             painter.drawLine(int(self.image_label.x()), int(self.image_label.y()), int(self.image_label.x() + self.image_label.width()), int(self.image_label.y() + self.image_label.height()))
         else:
@@ -228,14 +222,12 @@ class ARPESGUI(QMainWindow):
             #print("slope: " + str(slope))
             #print("intersect: " + str(intersect))
             painter.drawLine(int(self.image_label.x()), int(intersect), int(self.image_label.x() + self.image_label.width()), int(finaly))
-        
         painter.end()
         
         self.textLineFinalX.setText(str(pos.x() - self.image_label.x()))
         self.textLineFinalY.setText(str(pos.y() - self.image_label.y()))
         
         self.image_label.setPixmap(pixmap)
-        
         self.update()
 
         # Update the origin for next time.
@@ -266,11 +258,7 @@ class ARPESGUI(QMainWindow):
         #where posn1 is the starting point and posn2 is the ending point=
         x_new = np.linspace(posn1.x(), posn2.x(), len(self.tifArr))
         #go through the list of tiffim (tifarr)
-        #y_new = np.interp(x_new, x, y) 
         y_new = np.linspace(posn1.y(), posn2.y(), len(self.tifArr))
-        
-        #print("x_new" + str(x_new))
-        #print("y_new" + str(y_new))
         
         #check same size (they should always be the same size):
         if len(x_new) != len(y_new):
@@ -281,32 +269,14 @@ class ARPESGUI(QMainWindow):
         result = np.zeros(shape = (len(self.tifArr), len(self.tifArr)))
         index = 0
         for tiffIm in self.tifArr:
-            #print("tiffIm: ")
-            #print(tiffIm)
-            #print(tiffIm[0][0])
             for i in range(len(result[0])):
-                #print("i: ")
-                '''
-                print("f: ")
-                print(type(tiffIm[int(x_new[i])][int(y_new[i])]))
-                print("int: ")
-                print(type(int(tiffIm[int(x_new[i])][int(y_new[i])])))
-                '''
                 result[index][i] = int(tiffIm[int(x_new[i])][int(y_new[i])])
                 #result, get say first row, then populate that first row
                 #with tiffIm's points at x_new[i] and y_new[i]
             index += 1
         result = result.astype(np.uint8)
-        #print(result[0][0])
-        #print(type(result[0][0]))
-            
-        #print(result)
         
-        #plt.figure()
-        #plt.imshow(result)
-        #plt.show()
         self.showNewImage(result)
-            
         return
     
     def showNewImage(self, result):
@@ -317,106 +287,3 @@ class ARPESGUI(QMainWindow):
         self.w.show()
         
         
-
-class EnergyVMomentum(QWidget):
-    """
-    This "window" is a QWidget. If it has no parent, it
-    will appear as a free-floating window as we want.
-    """
-    #result = np.zeros((50,50))
-    
-    def __init__(self, results):
-        super().__init__()
-        QGraphicsView.__init__(self, parent=None)
-        
-        self.setWindowTitle("Energy vs Momentum Plot")
-        
-        #self.central_widget = QWidget()
-        #self.setCentralWidget(self.central_widget)
-        
-        self.layoutRow1 = QHBoxLayout()
-        self.layoutCol1 = QVBoxLayout()
-        self.layoutCol2 = QVBoxLayout()
-        
-        self.label = QLabel("Another Window")
-        #self.EM_label = QLabel("Placeholder Energy vs Momentum")
-        self.layoutCol1.addWidget(self.label)
-        #self.layoutCol2.addWidget(self.EM_label)
-        self.result = results
-        
-        
-        # a figure instance to plot on
-        self.figure = Figure()
-
-        # this is the Canvas Widget that displays the `figure`
-        # it takes the `figure` instance as a parameter to __init__
-        self.canvas = FigureCanvas(self.figure)
-        
-        self.show()
-        self.buildEM()
-        
-
-        sliderX = QSlider(Qt.Orientation.Horizontal) #create new horizontal slider
-        sliderY = QSlider(Qt.Orientation.Vertical) #create new horizontal slider
-        sliderX.setRange(0, self.result.shape())  # Set the range of the slider to the width of the image
-        sliderX.valueChanged.connect(self.slider_value_changed) #on change, call slider_value_changed
-        
-        layoutCol1.addWidget(slider, stretch=1)  # Add the slider to the layout with stretch=1 to make it take full width
-        
-        self.layoutCol2.addWidget(self.canvas)
-        self.layoutRow1.addLayout(self.layoutCol1)
-        self.layoutRow1.addLayout(self.layoutCol2)
-        #self.central_widget.setLayout(self.layoutRow1)
-        self.setLayout(self.layoutRow1)
-        
-    def buildEM(self):
-        #print("self: ")
-        #print(self.result)
-        
-        ''' this is for straight picture
-        newIm = Image.fromarray(self.result)
-        self.pixmap = QPixmap.fromImage(ImageQt.ImageQt(newIm))
-        self.pixmap = self.pixmap.scaled(512, 512)
-        print("pixmap: " + str(self.pixmap.width()) + " " + str(self.pixmap.height()))
-        self.resize(int(self.pixmap.width() / 2), int(self.pixmap.height() / 2))
-        self.EM_label.setPixmap(self.pixmap)
-        '''
-        
-        # this is the Navigation widget
-        # it takes the Canvas widget and a parent
-        '''from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar'''
-        #self.toolbar = NavigationToolbar(self.canvas, self)
-        
-        
-        #this is for graph
-        data = self.result
-
-        
-        # create an axis
-        ax = self.figure.add_subplot(111)
-        # discards the old graph
-        ax.clear()
-        # plot data
-        #ax.plot(data, '*-')
-        
-        ax.imshow(data, cmap='gray')
-        ax.set_xlabel('Momentum')
-        ax.set_ylabel('Energy') #recipricsl dpsce #jahn-teller effect
-        ax.invert_yaxis()
-        ax.set_title('Energy vs Momentum')
-        ax.grid(True)
-
-        # refresh canvas
-        self.canvas.draw()
-        
-
-        
-''' 
-        if self.w is None:
-            self.w = AnotherWindow()
-            self.w.show()
-
-        else:
-            self.w.close()  # Close window.
-            self.w = None  # Discard reference.
-'''
