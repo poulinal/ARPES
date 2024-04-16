@@ -128,7 +128,7 @@ class EnergyVMomentum(QWidget):
         #print(f"len: {len(energies)}")
         #print(f"datashape: {data.shape}")
         #data[0] = energies
-        print(f"result: {self.result}")
+        #print(f"result: {self.result}")
         
         #aspectRatio = (energies[len(energies)-1] - energies[0]) / self.result.shape[0]
         #print(energies[0])

@@ -207,13 +207,22 @@ class ARPESGUI(QMainWindow):
         painter.setPen(pen)
         painter.device()
         
+        '''
         #print(f"pos: {pos.y() - self.image_label.y()}, {self.starty}")
         if ((pos.x() - self.image_label.x()) - self.startx) == 0: #is verticle (note self.startx is local to image so we must make pos.x local)
             painter.drawLine(int(pos.x()), 0, 
                              int(pos.x()), int(self.image_label.height()))
         else: #is not verticle
-            intersectY, finalY, intersectX, slope = self.getLineProp(pos.x(), pos.y())
-            painter.drawLine(int(0), int(intersectY), int(self.image_label.width()), int(finalY)) #painter should be given local coord
+            interceptY, rightMostY, intersectX, slope = self.getLineProp(pos.x(), pos.y())
+            painter.drawLine(int(0), int(interceptY), int(self.image_label.width()), int(rightMostY)) #painter should be given local coord
+        '''
+        if ((pos.x() - self.image_label.x()) - self.startx) == 0: #is verticle (note self.startx is local to image so we must make pos.x local)
+            painter.drawLine(int(pos.x()), 0, 
+                             int(pos.x()), int(self.image_label.height()))
+        else: #is not verticle
+            interceptY, rightMostY, intersectX, slope = self.getLineProp(pos.x(), pos.y())
+            leftmostX, leftmostY, rightmostX, rightmostY = self.getLinePoints(interceptY, rightMostY, intersectX, slope)
+            painter.drawLine(int(leftmostX), int(leftmostY), int(rightmostX), int(rightmostY))
         painter.end()
         
         self.textLineFinalX.setText(str(pos.x() - self.image_label.x()))
@@ -223,43 +232,55 @@ class ARPESGUI(QMainWindow):
         self.update()
             
     def getLineProp(self, posx, posy):
-        posn1 = QPoint(posx, posy) #global value since this is gained from mouse
+        posn1 = QPoint(posx, posy) #global value since this is gained from mouse - this is last point dragged to
         #y=mx+b
         #x=(y-b)/m
+        #b=y-mx
         #m=(y2-y1)/(x2-x1)
         #print(f"posn1X {posn1.x()}, posn1Y {posn1.y()}, startx {self.startx}, starty {self.starty}")
         slope = ((posn1.y() - self.image_label.y()) - self.starty) / ((posn1.x() - self.image_label.x()) - self.startx)
-        intersectY = self.starty - slope * self.startx
-        finalY = slope * self.image_label.width() + intersectY
+        interceptY = self.starty - (slope * self.startx)
+        rightMostY = slope * (self.image_label.width() - self.image_label.x()) + interceptY
         if slope == 0:
-            return intersectY, finalY, self.image_label.x(), slope
+            return interceptY, rightMostY, self.image_label.x(), slope
         else:
-            intersectX = -intersectY / slope #from the top left corner
+            intersectX = -interceptY / slope #from the top left corner
             #print(f"intersectY {intersectY}, finalY {finalY}, intersectX {intersectX}, slope {slope}")
-            return intersectY, finalY, intersectX, slope
-        
-            
-    def interpl(self):
+            return interceptY, rightMostY, intersectX, slope
+    
+    def getLinePoints(self, interceptY, rightMostY, intersectX, slope):
         if (self.textLineX.text() == "" or self.textLineY.text() == "" or self.textLineFinalX.text() == "" or self.textLineFinalY.text() == ""):
             return #make sure there is a line to interpolate
+        height = self.image_label.height() - 1
+        width = self.image_label.width() - 1
+        
         #print(f"textX {self.textLineX.text()}, textY {self.textLineY.text()}")
-        intersectY, finalY, intersectX, slope = self.getLineProp(int(self.textLineFinalX.text()), int(self.textLineFinalY.text()))
-        finalX = (finalY - intersectY) / slope
+        #print(f"textFinalX {self.textLineFinalX.text()}, textFinalY {self.textLineFinalY.text()}")
+        #interceptY, rightMostY, intersectX, slope = self.getLineProp(int(self.textLineFinalX.text()), int(self.textLineFinalY.text()))
+        print(f"intersectY {interceptY}, rightMostY {rightMostY}, intersectX {intersectX}, slope {slope}")
+        
+        rightmostY = max(min(rightMostY, height), 0)
+        leftmostY = max(min(interceptY, height), 0)
+        if slope == 0:
+            leftmostX = 0
+            rightmostX = width
+        else:
+            leftmostX = max(min((leftmostY-interceptY) / slope, width), 0)
+            rightmostX = max(min((rightmostY-interceptY) / slope, width), 0)
+        return leftmostX, leftmostY, rightmostX, rightmostY
+        
+            
+    def interpl(self):        
+        interceptY, rightMostY, intersectX, slope = self.getLineProp(int(self.textLineFinalX.text()), int(self.textLineFinalY.text()))
+        leftmostX, leftmostY, rightmostX, rightmostY = self.getLinePoints(interceptY, rightMostY, intersectX, slope)
+            
         #y=mx+b
         #x=(y-b)/m
-        if intersectY < 0: #line starts past the imageBeginning (thus starts at the y of the image)
-            startX = ((self.image_label.y() - intersectY) / slope) - self.image_label.x()
-            posn1 = QPoint(int(startX), int(self.image_label.y()))
-            posn2 = QPoint(int(finalX), int(finalY))
-        else: #line starts at the imageBeginning (thus starts at the x of the image)
-            startInterX = int(self.image_label.x() - self.image_label.x())
-            startInterY = int(intersectY - self.image_label.y())
-            finalInterX = int(finalX - self.image_label.x())
-            finalInterY = min(max(int(finalY - self.image_label.y()), 0), 1024)
-            posn1 = QPoint(startInterX, startInterY)
-            posn2 = QPoint(finalInterX, finalInterY)
+        #posn1 = QPoint(int(min(leftmostX, rightmostX)), int(min(leftmostY, rightmostY)))
+        #posn2 = QPoint(int(max(leftmostX, rightmostX)), int(max(leftmostY, rightmostY)))
+        posn1 = QPoint(int(leftmostX), int(leftmostY))
+        posn2 = QPoint(int(rightmostX), int(rightmostY))
         #where posn1 is the starting point and posn2 is the ending point
-        #print(finalY)
         print(posn1, posn2)
         
         x_new = np.linspace(posn1.x(), posn2.x(), len(self.tifArr))
@@ -273,7 +294,7 @@ class ARPESGUI(QMainWindow):
         
         #only return those points in the array which align with x_new and y_new
         result = np.zeros(shape = (len(self.tifArr), len(self.tifArr)))
-        print(f"resultshape: {result.shape}")
+        #print(f"resultshape: {result.shape}")
         index = 0
         for tiffIm in self.tifArr:
             for i in range(len(result[0])):
