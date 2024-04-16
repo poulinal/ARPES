@@ -96,9 +96,9 @@ class EnergyVMomentum(QWidget):
         #    e.x, e.y, e.xdata, e.ydata))
         self.tracking = not self.tracking
         if e.inaxes:
-            pos = QPoint(int(e.xdata),int(e.ydata))
-            self.startx = pos.x()# - self.canvas.x()
-            self.starty = pos.y()# - self.canvas.y()
+            #pos = QPoint(int(e.xdata),int(e.ydata))
+            self.startx = e.xdata# - self.canvas.x()
+            self.starty = e.ydata# - self.canvas.y()
             
     #allow drag
     def plotMouseMove(self, e):
@@ -107,7 +107,8 @@ class EnergyVMomentum(QWidget):
         if e.inaxes and self.tracking:
             #print(f"Mouse position (x, y): ({e.x}, {e.y}), ({e.xdata}, {e.ydata})")
             #print(e.pos().x() - self.image_label.x()) //this is the true position with respect to the picture
-            pos = QPoint(int(e.xdata), int(e.ydata))
+            #pos = QPoint(int(e.xdata), int(e.ydata))
+            pos = (e.xdata, e.ydata)
             self.createArea(pos)
             
     def plotMouseRelease(self, e):
@@ -148,18 +149,18 @@ class EnergyVMomentum(QWidget):
     def createArea(self, pos):
         x0 = self.startx
         y0 = self.starty
-        xf = pos.x()
-        yf = pos.y()
+        xf = pos[0]
+        yf = pos[1]
         xLength = abs(x0 - xf)
         yLength = abs(y0 - yf)
-        dataTopX = np.linspace(x0, xf, xLength)
-        dataTopY = np.linspace(y0, y0, xLength)
-        dataBottomX = np.linspace(x0, xf, xLength)
-        dataBottomY = np.linspace(yf, yf, xLength)
-        dataLeftX = np.linspace(x0, x0, yLength)
-        dataLeftY = np.linspace(y0, yf, yLength)
-        dataRightX = np.linspace(xf, xf, yLength)
-        dataRightY = np.linspace(y0, yf, yLength)
+        dataTopX = np.linspace(x0, xf, int(xLength))
+        dataTopY = np.linspace(y0, y0, int(xLength))
+        dataBottomX = np.linspace(x0, xf, int(xLength))
+        dataBottomY = np.linspace(yf, yf, int(xLength))
+        dataLeftX = np.linspace(x0, x0, int(xLength))
+        dataLeftY = np.linspace(y0, yf, int(xLength))
+        dataRightX = np.linspace(xf, xf, int(xLength))
+        dataRightY = np.linspace(y0, yf, int(xLength))
         
         '''
         lineTop = self.ax.plot(dataTopX, dataTopY, '-')
