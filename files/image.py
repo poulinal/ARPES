@@ -257,7 +257,7 @@ class ARPESGUI(QMainWindow):
         #print(f"textX {self.textLineX.text()}, textY {self.textLineY.text()}")
         #print(f"textFinalX {self.textLineFinalX.text()}, textFinalY {self.textLineFinalY.text()}")
         #interceptY, rightMostY, intersectX, slope = self.getLineProp(int(self.textLineFinalX.text()), int(self.textLineFinalY.text()))
-        print(f"intersectY {interceptY}, rightMostY {rightMostY}, intersectX {intersectX}, slope {slope}")
+        #print(f"intersectY {interceptY}, rightMostY {rightMostY}, intersectX {intersectX}, slope {slope}")
         
         rightmostY = max(min(rightMostY, height), 0)
         leftmostY = max(min(interceptY, height), 0)
