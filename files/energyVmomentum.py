@@ -1,11 +1,9 @@
 ### 2024 Alex Poulin
 
 from PyQt6.QtWidgets import QMainWindow, QLabel, QHBoxLayout, QVBoxLayout, QWidget, QSlider
-from PyQt6.QtWidgets import QRadioButton, QFileDialog, QCheckBox, QButtonGroup, QGraphicsView 
-from PyQt6.QtWidgets import QLineEdit, QPushButton
-from PyQt6.QtGui import QMouseEvent, QPixmap, QPainter, QPen, QColor, QIntValidator
-from PyQt6.QtCore import Qt, QDir, QPoint, QTimer
-from tifConv import tiffIm
+from PyQt6.QtWidgets import QCheckBox, QButtonGroup, QGraphicsView, QLineEdit, QPushButton
+from PyQt6.QtCore import Qt, QDir, QPoint
+from tifConv import getEnergies
 from PIL import Image, ImageQt
 import numpy as np
 import os, sys
@@ -23,7 +21,7 @@ class EnergyVMomentum(QWidget):
     """
     #result = np.zeros((50,50))
     
-    def __init__(self, results):
+    def __init__(self, results, path):
         super().__init__()
         QGraphicsView.__init__(self, parent=None)
         #self.setMouseTracking(True)
@@ -39,8 +37,28 @@ class EnergyVMomentum(QWidget):
         self.result = results
         self.startx = 0
         self.starty = 0
-        self.last_x, self.last_y = None, None
         self.tracking = False
+        self.path = path
+        tif = []
+        for f in os.listdir(self.path):
+            if f.endswith('.TIF'):
+                tif.append(f)
+            if f.endswith('.DAT'):
+                self.dat = f
+            if f.endswith('.txt'):
+                self.energies = f
+        #tif = sorted(tif)
+        #self.tifArr = tiffIm(self.dir_path, tif)
+        
+        # Create a square button
+        intXButton = QPushButton("Int over X")
+        intXButton.setFixedSize(100, 50)  # Set the fixed size of the button to create a square shape
+        #intXButton.clicked.connect(self.interpl)
+        self.layoutCol1.addWidget(intXButton)
+        intYButton = QPushButton("Int over Y")
+        intYButton.setFixedSize(100, 50)  # Set the fixed size of the button to create a square shape
+        #intXButton.clicked.connect(self.interpl)
+        self.layoutCol1.addWidget(intYButton)
         
         
         # a figure instance to plot on
@@ -90,12 +108,6 @@ class EnergyVMomentum(QWidget):
             #print(f"Mouse position (x, y): ({e.x}, {e.y}), ({e.xdata}, {e.ydata})")
             #print(e.pos().x() - self.image_label.x()) //this is the true position with respect to the picture
             pos = QPoint(int(e.xdata), int(e.ydata))
-            if self.last_x is None: # First event.
-                #print("no last_x")
-                self.last_x = pos.x()
-                self.last_y = pos.y()
-                return # Ignore the first time.
-            
             self.createArea(pos)
             
     def plotMouseRelease(self, e):
@@ -107,20 +119,37 @@ class EnergyVMomentum(QWidget):
         self.ax = self.figure.add_subplot(111)
         # discards the old graph
         self.ax.clear()
+        
 
-        self.ax.imshow(self.result, cmap='gray') #recipricsl dpsce #jahn-teller effect
+        #data = self.result
+        energies = getEnergies(self.path, self.dat)
+        #print(f"energies: {energies}")
+        #print(f"len: {len(energies)}")
+        #print(f"datashape: {data.shape}")
+        #data[0] = energies
+        print(f"result: {self.result}")
+        
+        #aspectRatio = (energies[len(energies)-1] - energies[0]) / self.result.shape[0]
+        #print(energies[0])
+        #print(energies[len(energies)-1])
+        #print(self.result.shape[0])
+        #print(self.result.shape[1])
+        #print((energies[len(energies)-1] - energies[0]))
+
+        #self.ax.imshow(self.result, cmap='gray')
+        self.ax.imshow(self.result, cmap='gray', extent=[0, self.result.shape[0], energies[0], energies[len(energies)-1]]) #recipricsl dpsce #jahn-teller effect
+        self.ax.set_aspect(self.result.shape[0] / (energies[len(energies)-1] - energies[0]))
+        #self.ax.pcolormesh(np.linspace(0, self.result.shape[0], self.result.shape[0]), energies, self.result, cmap='gray', shading='nearest')
         self.ax.invert_yaxis()
 
         # refresh canvas
         self.canvas.draw()
         
     def createArea(self, pos):
-        x0 = self.startx# - self.canvas.x()
-        y0 = self.starty# - self.canvas.y()
-        xf = pos.x()# - self.canvas.x()
-        yf = pos.y()# - self.canvas.y()
-        #print(x0, y0, xf, yf)
-        #self.ax.clear()
+        x0 = self.startx
+        y0 = self.starty
+        xf = pos.x()
+        yf = pos.y()
         xLength = abs(x0 - xf)
         yLength = abs(y0 - yf)
         dataTopX = np.linspace(x0, xf, xLength)
@@ -147,13 +176,13 @@ class EnergyVMomentum(QWidget):
             # First time we have no plot reference, so do a normal plot.
             # .plot returns a list of line <reference>s, as we're
             # only getting one we can take the first element.
-            plot_refs = self.ax.plot(dataTopX, dataTopY, '-')
+            plot_refs = self.ax.plot(dataTopX, dataTopY, '-', color='yellow')
             self._plot_ref[0] = plot_refs[0]
-            plot_refs = self.ax.plot(dataBottomX, dataBottomY, '-')
+            plot_refs = self.ax.plot(dataBottomX, dataBottomY, '-', color='yellow')
             self._plot_ref[1] = plot_refs[0]
-            plot_refs = self.ax.plot(dataLeftX, dataLeftY, '-')
+            plot_refs = self.ax.plot(dataLeftX, dataLeftY, '-', color='yellow')
             self._plot_ref[2] = plot_refs[0]
-            plot_refs = self.ax.plot(dataRightX, dataRightY, '-')
+            plot_refs = self.ax.plot(dataRightX, dataRightY, '-', color='yellow')
             self._plot_ref[3] = plot_refs[0]
             
         else:

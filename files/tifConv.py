@@ -1,7 +1,11 @@
+### 2024 Alex Poulin
+
 import numpy as np
 from PIL import Image
+from pandas import read_csv as pd
 
-def tiffIm(path, tif):# Converts all Tiff files in the form of an array
+# Converts all Tiff files in the form of an array
+def tiffIm(path, tif):
     tifIm = []
     for tiffName in tif: 
         tiffFile = Image.open(path + "/" + tiffName) #open the tiff file
@@ -9,10 +13,30 @@ def tiffIm(path, tif):# Converts all Tiff files in the form of an array
         tifIm.append(imArray) #saves the tiff image array
     return tifIm
 
-
-def getEnergies(path, tif): # Gets the energies from the tiff files
+# Gets the energies from the tiff files
+def getEnergies(path, dat): 
+    df = pd(path + "/" + dat, header=None, names=['col'])
     energies = []
-    for tiffName in tif:
-        tiffFile = Image.open(path + "/" + tiffName) #open the tiff file
-        energies.append(tiffFile.tag_v2[0x1429][0]) #gets the energy from the tiff file
+    num = ""
+    for index, row in df.iterrows(): #this iterates through each row
+        value = row['col'] #row['col'] is a string of each column
+        
+        for element in value: #this iterates through the string on that row
+            
+            if element.isnumeric() or element == ".": #this goes until we hit the numbers (aka tiff file numbers)
+                num = num + element #this will accumulate the numbers as long as the string element is numeric
+                
+            else:
+                if not num=="": #if there were no numbers, reset num and break
+                    energies.append(float(num)) #otherwise add it to the array
+                    #print(array)
+                num = ""
+                break
+            #print(array)
+    lastNum = energies[-1] # this is the last number which will be the number of tiff files in the DAT
+    #print(lastNum)
     return energies
+
+#returns info from the dat file, FILE_ID, EXPERIMENT_NAME, MEASUREMENT_NAME, TIMESTAMP, INSTITUTION, SAMPLE_NAME
+def getInfo(path):
+    return
