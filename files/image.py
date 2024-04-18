@@ -18,6 +18,8 @@ class ARPESGUI(QMainWindow):
     im = Image.fromarray(np.zeros((1,1)))
     startx = 0
     starty = 0
+    lastx = 0
+    lasty = 0
     
     def __init__(self):
         super().__init__()
@@ -158,6 +160,8 @@ class ARPESGUI(QMainWindow):
         self.im = Image.fromarray(self.tifArr[i])
         pixmap = QPixmap.fromImage(ImageQt.ImageQt(self.im)) #set image based on numpy array
         self.image_label.setPixmap(pixmap)
+        if (self.textLineX.text() != "" or self.textLineY.text() != "" or self.textLineFinalX.text() != "" or self.textLineFinalY.text() != ""):
+            self.makeLine((self.lastx, self.lasty))
     
     #on click, start tracking
     def mousePressEvent(self, e):
@@ -187,12 +191,14 @@ class ARPESGUI(QMainWindow):
         
         #later to keep the image from being redrawn gonna have to draw on a new pixmap, overlay, and save the drawing
         self.image_label.setPixmap(QPixmap.fromImage(ImageQt.ImageQt(self.im)))
-        self.makeLine(e.pos())
+        self.makeLine((e.pos().x(), e.pos().y()))
+        self.lastx = e.pos().x() - self.image_label.x()
+        self.lasty = e.pos().y() - self.image_label.y()
         
     #on text change, update the line
     def text_edited(self, s):
         if (self.textLineX.text() != "" and self.textLineY.text() != "" and self.textLineFinalX.text() != "" and self.textLineFinalY.text() != ""):
-            pos = QPoint(int(self.textLineX.text()), int(self.textLineY.text()))
+            pos = (int(self.textLineX.text()), int(self.textLineY.text()))
             self.image_label.setPixmap(QPixmap.fromImage(ImageQt.ImageQt(self.im)))
             self.makeLine(pos)
         
@@ -207,26 +213,18 @@ class ARPESGUI(QMainWindow):
         painter.setPen(pen)
         painter.device()
         
-        '''
+    
         #print(f"pos: {pos.y() - self.image_label.y()}, {self.starty}")
-        if ((pos.x() - self.image_label.x()) - self.startx) == 0: #is verticle (note self.startx is local to image so we must make pos.x local)
-            painter.drawLine(int(pos.x()), 0, 
-                             int(pos.x()), int(self.image_label.height()))
+        if ((pos[0] - self.image_label.x()) - self.startx) == 0: #is verticle (note self.startx is local to image so we must make pos.x local)
+            painter.drawLine(int(pos[0]), 0, 
+                             int(pos[0]), int(self.image_label.height()))
         else: #is not verticle
-            interceptY, rightMostY, intersectX, slope = self.getLineProp(pos.x(), pos.y())
+            interceptY, rightMostY, intersectX, slope = self.getLineProp(pos[0], pos[1])
             painter.drawLine(int(0), int(interceptY), int(self.image_label.width()), int(rightMostY)) #painter should be given local coord
-        '''
-        if ((pos.x() - self.image_label.x()) - self.startx) == 0: #is verticle (note self.startx is local to image so we must make pos.x local)
-            painter.drawLine(int(pos.x()), 0, 
-                             int(pos.x()), int(self.image_label.height()))
-        else: #is not verticle
-            interceptY, rightMostY, intersectX, slope = self.getLineProp(pos.x(), pos.y())
-            leftmostX, leftmostY, rightmostX, rightmostY = self.getLinePoints(interceptY, rightMostY, intersectX, slope)
-            painter.drawLine(int(leftmostX), int(leftmostY), int(rightmostX), int(rightmostY))
         painter.end()
         
-        self.textLineFinalX.setText(str(pos.x() - self.image_label.x()))
-        self.textLineFinalY.setText(str(pos.y() - self.image_label.y()))
+        self.textLineFinalX.setText(str(pos[0] - self.image_label.x()))
+        self.textLineFinalY.setText(str(pos[1] - self.image_label.y()))
         
         self.image_label.setPixmap(pixmap)
         self.update()
@@ -247,8 +245,10 @@ class ARPESGUI(QMainWindow):
             intersectX = -interceptY / slope #from the top left corner
             #print(f"intersectY {intersectY}, finalY {finalY}, intersectX {intersectX}, slope {slope}")
             return interceptY, rightMostY, intersectX, slope
-    
-    def getLinePoints(self, interceptY, rightMostY, intersectX, slope):
+        
+            
+    def interpl(self): 
+        interceptY, rightMostY, intersectX, slope = self.getLineProp(int(self.textLineFinalX.text()), int(self.textLineFinalY.text()))
         if (self.textLineX.text() == "" or self.textLineY.text() == "" or self.textLineFinalX.text() == "" or self.textLineFinalY.text() == ""):
             return #make sure there is a line to interpolate
         height = self.image_label.height() - 1
@@ -266,13 +266,7 @@ class ARPESGUI(QMainWindow):
             rightmostX = width
         else:
             leftmostX = max(min((leftmostY-interceptY) / slope, width), 0)
-            rightmostX = max(min((rightmostY-interceptY) / slope, width), 0)
-        return leftmostX, leftmostY, rightmostX, rightmostY
-        
-            
-    def interpl(self):        
-        interceptY, rightMostY, intersectX, slope = self.getLineProp(int(self.textLineFinalX.text()), int(self.textLineFinalY.text()))
-        leftmostX, leftmostY, rightmostX, rightmostY = self.getLinePoints(interceptY, rightMostY, intersectX, slope)
+            rightmostX = max(min((rightmostY-interceptY) / slope, width), 0)       
             
         #y=mx+b
         #x=(y-b)/m
@@ -281,29 +275,37 @@ class ARPESGUI(QMainWindow):
         posn1 = QPoint(int(leftmostX), int(leftmostY))
         posn2 = QPoint(int(rightmostX), int(rightmostY))
         #where posn1 is the starting point and posn2 is the ending point
-        print(posn1, posn2)
+        #print(posn1, posn2)
         
-        x_new = np.linspace(posn1.x(), posn2.x(), len(self.tifArr))
-        y_new = np.linspace(posn1.y(), posn2.y(), len(self.tifArr))
+        length = np.sqrt((posn2.x() - posn1.x())**2 + (posn2.y() - posn1.y())**2)
+        #print(f"length: {length}")
+        
+        xlen = int(length)
+        ylen = len(self.tifArr)
+        x_new = np.linspace(posn1.x(), posn2.x(), xlen)
+        y_new = np.linspace(posn1.y(), posn2.y(), xlen)
         #print(x_new, y_new)
         
-        #check same size (they should always be the same size):
-        if len(x_new) != len(y_new):
-            print("error")
-            return
+        #maybe add some checks here to dumbproof
+        
+        #print(f"tiffIm: {self.tifArr[70][int(x_new[0])][int(y_new[0])]}")
         
         #only return those points in the array which align with x_new and y_new
-        result = np.zeros(shape = (len(self.tifArr), len(self.tifArr)))
+        result = np.zeros(shape = (ylen, xlen)) #this will eventually be converted to image so should be height by width
+        print(f"resultshape: {result.shape}")
         #print(f"resultshape: {result.shape}")
-        index = 0
+        imIndex = 0
         for tiffIm in self.tifArr:
-            for i in range(len(result[0])):
-                result[index][i] = int(tiffIm[int(x_new[i])][int(y_new[i])])
+            for x in range(result.shape[1]):
+                #print(f"tiffIm: {tiffIm[int(x_new[i])][int(y_new[i])]}")
+                result[imIndex][x] = int(tiffIm[int(x_new[x])][int(y_new[x])])
                 #result, get say first row, then populate that first row
                 #with tiffIm's points at x_new[i] and y_new[i]
-            index += 1
+            imIndex += 1
         #result = result.astype(np.uint8)
         result = result.astype(float)
+        
+        #print(f"result: {result}")
         
         self.showNewImage(result)
         return
@@ -311,7 +313,7 @@ class ARPESGUI(QMainWindow):
     def showNewImage(self, result):
         #print("result")
        #print(result)
-        self.w = EnergyVMomentum(result, self.dir_path)
+        self.w = EnergyVMomentum(result, self.dir_path, self.tifArr, self.dat)
         #w.result = result
         self.w.show()
         

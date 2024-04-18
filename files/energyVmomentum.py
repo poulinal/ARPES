@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import QMainWindow, QLabel, QHBoxLayout, QVBoxLayout, QWidg
 from PyQt6.QtWidgets import QCheckBox, QButtonGroup, QGraphicsView, QLineEdit, QPushButton
 from PyQt6.QtCore import Qt, QDir, QPoint
 from tifConv import getEnergies
+from distributionCurve import DistCrve
 from PIL import Image, ImageQt
 import numpy as np
 import os, sys
@@ -21,7 +22,7 @@ class EnergyVMomentum(QWidget):
     """
     #result = np.zeros((50,50))
     
-    def __init__(self, results, path):
+    def __init__(self, results, path, tifArr, dat):
         super().__init__()
         QGraphicsView.__init__(self, parent=None)
         #self.setMouseTracking(True)
@@ -39,26 +40,19 @@ class EnergyVMomentum(QWidget):
         self.starty = 0
         self.tracking = False
         self.path = path
-        tif = []
-        for f in os.listdir(self.path):
-            if f.endswith('.TIF'):
-                tif.append(f)
-            if f.endswith('.DAT'):
-                self.dat = f
-            if f.endswith('.txt'):
-                self.energies = f
-        #tif = sorted(tif)
-        #self.tifArr = tiffIm(self.dir_path, tif)
+        self.tifArr = tifArr
+        self.dat = dat
         
         # Create a square button
-        intXButton = QPushButton("Int over X")
-        intXButton.setFixedSize(100, 50)  # Set the fixed size of the button to create a square shape
-        #intXButton.clicked.connect(self.interpl)
-        self.layoutCol1.addWidget(intXButton)
-        intYButton = QPushButton("Int over Y")
-        intYButton.setFixedSize(100, 50)  # Set the fixed size of the button to create a square shape
-        #intXButton.clicked.connect(self.interpl)
-        self.layoutCol1.addWidget(intYButton)
+        self.intXButton = QPushButton("Int over X")
+        self.intXButton.setFixedSize(100, 50)  # Set the fixed size of the button to create a square shape
+        self.layoutCol1.addWidget(self.intXButton)
+        self.intYButton = QPushButton("Int over Y")
+        self.intYButton.setFixedSize(100, 50)  # Set the fixed size of the button to create a square shape
+        self.layoutCol1.addWidget(self.intYButton)
+        
+        self.intXButton.clicked.connect(self.integrate)
+        self.intYButton.clicked.connect(self.integrate)
         
         
         # a figure instance to plot on
@@ -138,10 +132,9 @@ class EnergyVMomentum(QWidget):
         #print((energies[len(energies)-1] - energies[0]))
 
         #self.ax.imshow(self.result, cmap='gray')
-        self.ax.imshow(self.result, cmap='gray', extent=[0, self.result.shape[0], energies[0], energies[len(energies)-1]]) #recipricsl dpsce #jahn-teller effect
-        self.ax.set_aspect(self.result.shape[0] / (energies[len(energies)-1] - energies[0]))
+        self.ax.imshow(self.result, cmap='gray', extent=[0, self.result.shape[1], energies[0], energies[len(energies)-1]]) #recipricsl dpsce #jahn-teller effect
+        self.ax.set_aspect(self.result.shape[1] / (energies[len(energies)-1] - energies[0]))
         #self.ax.pcolormesh(np.linspace(0, self.result.shape[0], self.result.shape[0]), energies, self.result, cmap='gray', shading='nearest')
-        self.ax.invert_yaxis()
 
         # refresh canvas
         self.canvas.draw()
@@ -220,7 +213,20 @@ class EnergyVMomentum(QWidget):
         self.ax.xaxis.label.set_color('white')
         self.ax.title.set_color('white')
         self.ax.grid(True)
+        #self.ax.invert_yaxis()
         
+    
+    def integrate(self):
+        if self.sender() == self.intXButton:
+            #print("Integrate over X")
+            self.w = DistCrve(self.result, self.tifArr, self.dat, "EDC")
+            #w.result = result
+            self.w.show()
+        else:
+            #print("Integrate over Y")
+            self.w = DistCrve(self.result, self.tifArr, self.dat, "MDC")
+            #w.result = result
+            self.w.show()
 
          
         
