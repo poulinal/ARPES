@@ -1,7 +1,7 @@
 ### 2024 Alex Poulin
 
 from PyQt6.QtWidgets import QMainWindow, QLabel, QHBoxLayout, QVBoxLayout, QWidget, QSlider
-from PyQt6.QtWidgets import QCheckBox, QButtonGroup, QGraphicsView, QLineEdit, QPushButton
+from PyQt6.QtWidgets import QCheckBox, QButtonGroup, QGraphicsView, QLineEdit, QPushButton, QFileDialog, QMessageBox
 from PyQt6.QtCore import Qt, QDir, QPoint
 from PIL import Image, ImageQt
 import numpy as np
@@ -24,6 +24,7 @@ class DistCrve(QWidget):
         super().__init__()
         QGraphicsView.__init__(self, parent=None)
         #self.setMouseTracking(True)
+        self.newResult = None
         
         self.setWindowTitle(type)
 
@@ -45,13 +46,10 @@ class DistCrve(QWidget):
         
         #print(f"DC result: {self.result}")
         
-        # Create a square button
-        self.intXButton = QPushButton("Int over X")
-        self.intXButton.setFixedSize(100, 50)  # Set the fixed size of the button to create a square shape
-        #self.layoutCol1.addWidget(self.intXButton)
-        self.intYButton = QPushButton("Int over Y")
-        self.intYButton.setFixedSize(100, 50)  # Set the fixed size of the button to create a square shape
-        #self.layoutCol1.addWidget(self.intYButton)
+        self.saveButton = QPushButton("Save File")
+        self.saveButton.setFixedSize(100, 50)  # Set the fixed size of the button to create a square shape
+        self.layoutCol1.addWidget(self.saveButton)
+        self.saveButton.clicked.connect(self.saveFile)
         
         
         # a figure instance to plot on
@@ -87,32 +85,14 @@ class DistCrve(QWidget):
         self.ax = self.figure.add_subplot(111)
         # discards the old graph
         self.ax.clear()
-        
 
-        #data = self.result
-        #print(f"energies: {energies}")
-        #print(f"len: {len(energies)}")
-        #print(f"datashape: {data.shape}")
-        #data[0] = energies
-        #print(f"result: {self.result}")
-        
-        #aspectRatio = (energies[len(energies)-1] - energies[0]) / self.result.shape[0]
-        #print(energies[0])
-        #print(energies[len(energies)-1])
-        #print(self.result.shape[0])
-        #print(self.result.shape[1])
-        #print((energies[len(energies)-1] - energies[0]))
-
-        newResult = self.configureType()
-        self.ax.plot(newResult[0], '-')
+        self.newResult = self.configureType()
+        self.ax.plot(self.newResult[0], '-')
         '''
         for row in newResult[0]:
             print(row)
             self.ax.plot(row, '-')
             '''
-        #self.ax.imshow(self.result, cmap='gray', extent=[0, self.result.shape[0], energies[0], energies[len(energies)-1]]) #recipricsl dpsce #jahn-teller effect
-        #self.ax.set_aspect(self.result.shape[0] / (energies[len(energies)-1] - energies[0]))
-        #self.ax.pcolormesh(np.linspace(0, self.result.shape[0], self.result.shape[0]), energies, self.result, cmap='gray', shading='nearest')
 
         # refresh canvas
         self.canvas.draw()
@@ -171,7 +151,31 @@ class DistCrve(QWidget):
         newResult = newResult.astype(float)
         #print(f"newResult: {newResult}")
         return newResult
-            
+    
+    
+    def saveFile(self):
+        #options = QFileDialog.options()
+        #options |= QFileDialog.DontUseNativeDialog
+        file_name, _ = QFileDialog.getSaveFileName(self,"Save File","","Text Files(*.txt)")#,options = options)
+        if file_name:
+            f = open(file_name, 'w')
+            text = self.newResult
+            np.set_printoptions(threshold=np.inf)
+            f.write(np.array_str(text))
+            self.setWindowTitle(str(os.path.basename(file_name)) + " - ARPES Analysis")
+            f.close()
+            np.set_printoptions()#revert to defautl
+            return True
+        else:
+            return self.errorDialogue("Error", "File not saved")
+        
+    def errorDialogue(self, title, message):
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Icon.Critical)
+        msg.setText(message)
+        msg.setWindowTitle(title)
+        msg.exec()
+        return False
         
          
         

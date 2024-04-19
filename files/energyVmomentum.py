@@ -1,7 +1,7 @@
 ### 2024 Alex Poulin
 
 from PyQt6.QtWidgets import QMainWindow, QLabel, QHBoxLayout, QVBoxLayout, QWidget, QSlider
-from PyQt6.QtWidgets import QCheckBox, QButtonGroup, QGraphicsView, QLineEdit, QPushButton
+from PyQt6.QtWidgets import QCheckBox, QButtonGroup, QGraphicsView, QLineEdit, QPushButton, QFileDialog, QMessageBox
 from PyQt6.QtCore import Qt, QDir, QPoint
 from tifConv import getEnergies
 from distributionCurve import DistCrve
@@ -22,7 +22,7 @@ class EnergyVMomentum(QWidget):
     """
     #result = np.zeros((50,50))
     
-    def __init__(self, results, path, tifArr, dat):
+    def __init__(self, results, path, tifArr, dat, info):
         super().__init__()
         QGraphicsView.__init__(self, parent=None)
         #self.setMouseTracking(True)
@@ -44,7 +44,12 @@ class EnergyVMomentum(QWidget):
         self.path = path
         self.tifArr = tifArr
         self.dat = dat
+        self.info = info
         
+        
+        self.saveButton = QPushButton("Save File")
+        self.saveButton.setFixedSize(100, 50)  # Set the fixed size of the button to create a square shape
+        self.layoutCol1.addWidget(self.saveButton)
         # Create a square button
         self.intXButton = QPushButton("Int over X")
         self.intXButton.setFixedSize(100, 50)  # Set the fixed size of the button to create a square shape
@@ -55,6 +60,7 @@ class EnergyVMomentum(QWidget):
         
         self.intXButton.clicked.connect(self.integrate)
         self.intYButton.clicked.connect(self.integrate)
+        self.saveButton.clicked.connect(self.saveFile)
         
         
         # a figure instance to plot on
@@ -221,7 +227,7 @@ class EnergyVMomentum(QWidget):
         
     
     def integrate(self):
-        print(f"posns ({self.startx}, {self.starty}), ({self.lastx}, {self.lasty})")
+        #print(f"posns ({self.startx}, {self.starty}), ({self.lastx}, {self.lasty})")
         if self.sender() == self.intXButton:
             #print("Integrate over X")
             self.w = DistCrve(self.result, self.tifArr, self.dat, "EDC", (self.startx, self.starty), (self.lastx, self.lasty))
@@ -232,6 +238,29 @@ class EnergyVMomentum(QWidget):
             self.w = DistCrve(self.result, self.tifArr, self.dat, "MDC", (self.startx, self.starty), (self.lastx, self.lasty))
             #w.result = result
             self.w.show()
-
+            
+    def saveFile(self):
+        #options = QFileDialog.options()
+        #options |= QFileDialog.DontUseNativeDialog
+        file_name, _ = QFileDialog.getSaveFileName(self,"Save File",str(self.info[1]),"Text Files(*.txt)")#,options = options)
+        if file_name:
+            f = open(file_name, 'w')
+            text = self.result
+            np.set_printoptions(threshold=np.inf)
+            f.write(np.array_str(text))
+            self.setWindowTitle(str(os.path.basename(file_name)) + " - ARPES Analysis")
+            f.close()
+            np.set_printoptions()#revert to defautl
+            return True
+        else:
+            return self.errorDialogue("Error", "File not saved")
+        
+    def errorDialogue(self, title, message):
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Icon.Critical)
+        msg.setText(message)
+        msg.setWindowTitle(title)
+        msg.exec()
+        return False
          
         

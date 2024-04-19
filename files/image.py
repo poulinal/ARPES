@@ -5,8 +5,7 @@ from PyQt6.QtWidgets import QRadioButton, QFileDialog, QCheckBox, QButtonGroup, 
 from PyQt6.QtWidgets import QLineEdit, QPushButton
 from PyQt6.QtGui import QMouseEvent, QPixmap, QPainter, QPen, QColor, QIntValidator
 from PyQt6.QtCore import Qt, QDir, QPoint
-from tifConv import tiffIm
-from parser import parseFolder
+from tifConv import tiffIm, getInfo
 from energyVmomentum import EnergyVMomentum
 from PIL import Image, ImageQt
 import numpy as np
@@ -101,6 +100,15 @@ class ARPESGUI(QMainWindow):
         submitButton.clicked.connect(self.interpl)
         layoutCol2Row3.addWidget(submitButton)
         
+        infoHead = getInfo(self.dir_path, self.dat)
+        #FILE_ID, EXPERIMENT_NAME, MEASUREMENT_NAME, TIMESTAMP, INSTITUTION, SAMPLE
+        #columnsToInclude = ['FILE_ID*', 'EXPERIMENT_NAME*', 'MEASUREMENT_NAME*', 'TIMESTAMP*', 'INSTITUTION*', 'SAMPLE*']
+        self.infoStr = infoHead.apply(lambda row: row.astype(str).values, axis=1)
+        #print(info[1])
+        infoHead = infoHead.to_string(index=False, header=False)
+        
+        self.info = QLabel(infoHead)
+        
         self.textLineX = QLineEdit()
         self.textLineY = QLineEdit()
         self.textLineFinalX = QLineEdit()
@@ -129,10 +137,11 @@ class ARPESGUI(QMainWindow):
         self.textLineX.textEdited.connect(self.text_edited)
         self.textLineY.textEdited.connect(self.text_edited)
         
+        layoutCol2Row1.addWidget(self.info)
         controlWidgetList = [parenLabel, self.textLineX, commaLabel, self.textLineY, paren2Label]
         controlWidgetList2 = [parenLabel2, self.textLineFinalX, commaLabel2, self.textLineFinalY, paren2Label2]
         for w in controlWidgetList:
-            layoutCol2Row1.addWidget(w)
+            layoutCol2Row2.addWidget(w)
         for w in controlWidgetList2:
             layoutCol2Row2.addWidget(w)
         
@@ -292,7 +301,7 @@ class ARPESGUI(QMainWindow):
         
         #only return those points in the array which align with x_new and y_new
         result = np.zeros(shape = (ylen, xlen)) #this will eventually be converted to image so should be height by width
-        print(f"resultshape: {result.shape}")
+        #print(f"resultshape: {result.shape}")
         #print(f"resultshape: {result.shape}")
         imIndex = 0
         for tiffIm in self.tifArr:
@@ -312,8 +321,9 @@ class ARPESGUI(QMainWindow):
     
     def showNewImage(self, result):
         #print("result")
-       #print(result)
-        self.w = EnergyVMomentum(result, self.dir_path, self.tifArr, self.dat)
+        #print(result)
+        #print(type(self.info))
+        self.w = EnergyVMomentum(result, self.dir_path, self.tifArr, self.dat, self.infoStr)
         #w.result = result
         self.w.show()
         
