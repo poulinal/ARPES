@@ -192,8 +192,8 @@ class ARPESGUI(QMainWindow):
         #later to keep the image from being redrawn gonna have to draw on a new pixmap, overlay, and save the drawing
         self.image_label.setPixmap(QPixmap.fromImage(ImageQt.ImageQt(self.im)))
         self.makeLine((e.pos().x(), e.pos().y()))
-        self.lastx = e.pos().x() - self.image_label.x()
-        self.lasty = e.pos().y() - self.image_label.y()
+        self.lastx = e.pos().x()# - self.image_label.x()
+        self.lasty = e.pos().y()# - self.image_label.y()
         
     #on text change, update the line
     def text_edited(self, s):

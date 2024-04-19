@@ -36,8 +36,10 @@ class EnergyVMomentum(QWidget):
         self.label = QLabel("Another Window")
         self.layoutCol1.addWidget(self.label)
         self.result = results
-        self.startx = 0
-        self.starty = 0
+        self.startx = None
+        self.starty = None
+        self.lastx = None
+        self.lasty = None
         self.tracking = False
         self.path = path
         self.tifArr = tifArr
@@ -103,6 +105,8 @@ class EnergyVMomentum(QWidget):
             #print(e.pos().x() - self.image_label.x()) //this is the true position with respect to the picture
             #pos = QPoint(int(e.xdata), int(e.ydata))
             pos = (e.xdata, e.ydata)
+            self.lastx = e.xdata
+            self.lasty = e.ydata
             self.createArea(pos)
             
     def plotMouseRelease(self, e):
@@ -217,14 +221,15 @@ class EnergyVMomentum(QWidget):
         
     
     def integrate(self):
+        print(f"posns ({self.startx}, {self.starty}), ({self.lastx}, {self.lasty})")
         if self.sender() == self.intXButton:
             #print("Integrate over X")
-            self.w = DistCrve(self.result, self.tifArr, self.dat, "EDC")
+            self.w = DistCrve(self.result, self.tifArr, self.dat, "EDC", (self.startx, self.starty), (self.lastx, self.lasty))
             #w.result = result
             self.w.show()
         else:
             #print("Integrate over Y")
-            self.w = DistCrve(self.result, self.tifArr, self.dat, "MDC")
+            self.w = DistCrve(self.result, self.tifArr, self.dat, "MDC", (self.startx, self.starty), (self.lastx, self.lasty))
             #w.result = result
             self.w.show()
 
