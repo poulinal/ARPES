@@ -143,53 +143,32 @@ class DistCrve(QWidget):
         #only return those points in the array which align with x_new and y_new
         #print(f"resultshape: {result.shape}")
         
-        if self.posStart[0] is None or self.posStart[1] is None or self.posEnd[0] is None or self.posEnd[1] is None:
-            if self.type == "EDC": #MDC integration over y
-                newResult = np.zeros(shape = (1, self.result.shape[0]))
-                #print(f"newResult: {newResult.shape}")
-                for row in self.result:
-                    #print(f"row: {row}")
-                    #print(range(len(newResult[0])))
-                    for col in range(len(newResult[0])):
-                        #print(row[col])
-                        newResult[0][col] += row[col]
-                        #print(f"newResult: {newResult}")
-            else: #EDC integration over x
-                newResult = np.zeros(shape = (1, self.result.shape[1]))
-                #print(f"newResult: {newResult.shape}")
-                for row in range(self.result.shape[0]): #range of result height
-                    #for col in range(len(newResult)):
-                    newResult[0] += self.result[row]
-            newResult = newResult.astype(float)
+        if self.posStart[0] is None or self.posStart[1] is None or self.posEnd[0] is None or self.posEnd[1] is None: #get full image
+            selectedBox = self.result
         else:
-            print (f"resultShape: {self.result.shape}")
-            #print(f"posStart: {self.posStart}")
-            #print(f"posEnd: {self.posEnd}")
             selectedBox = self.result[int(min(self.posStart[1], self.posEnd[1])): int(max(self.posStart[1], self.posEnd[1])), int(min(self.posStart[0], self.posEnd[0])): int(max(self.posStart[0], self.posEnd[0]))]
-            print(f"selectedBox: {selectedBox}")
-            print(f"selectedBoxShape: {selectedBox.shape}")
-            if self.type == "EDC": #EDC integration over c
-                newResult = np.zeros(shape = (1, abs(int(self.posEnd[0] - self.posStart[0]))))
-                #print(f"newResult: {newResult.shape}")
-                print(int(max(self.posStart[0], self.posEnd[0])) - 1)
-                #print(f"posSize: {self.posStart[0] - self.posEnd[0]}")
-                for row in range(int(min(self.posStart[1], self.posEnd[1])), int(max(self.posStart[1], self.posEnd[1]))):
-                    #print(f"row: {row}")
-                    #print(range(len(newResult[0])))
-                    for col in range(int(min(self.posStart[0], self.posEnd[0])), int(max(self.posStart[0], self.posEnd[0])) - 1):
-                        #print(self.result[row][col])
-                        newResult[0][col] += self.result[row][col]
-                        #print(f"newResult: {newResult}")
-            else: #MDC integration over y
-                newResult = np.zeros(shape = (1, abs(int(self.posEnd[1] - self.posStart[1]))))
-                #print(f"newResult: {newResult.shape}")
-                #print(f"posSize: {self.posStart[0] - self.posEnd[0]}")
-                for row in range(int(min(self.posStart[1], self.posEnd[1])), int(max(self.posStart[1], self.posEnd[1]))): #range of result height
-                    for col in range(int(min(self.posStart[0], self.posEnd[0])), int(max(self.posStart[0], self.posEnd[0])) - 1):
-                        #print(self.result[row])
-                        newResult[0] += self.result[row]
-            #print(f"newResult: {newResult}")
-            newResult = newResult.astype(float)
+        #print (f"resultShape: {self.result.shape}")
+        #print(f"posStart: {self.posStart}")
+        #print(f"posEnd: {self.posEnd}")
+        #print(f"selectedBox: {selectedBox}")
+        #print(f"selectedBoxShape: {selectedBox.shape}")
+        if self.type == "EDC": #EDC integration over x
+            newResult = np.zeros(shape = (1, selectedBox.shape[0]))
+            #print(f"newResult: {newResult.shape}")
+            for row in selectedBox:
+                #print(f"row: {row}")
+                #print(range(len(newResult[0])))
+                for col in range(len(newResult[0])):
+                    #print(row[col])
+                    newResult[0][col] += row[col]
+                    #print(f"newResult: {newResult}")
+        else: #MDC integration over y
+            newResult = np.zeros(shape = (1, selectedBox.shape[1]))
+            #print(f"newResult: {newResult.shape}")
+            for row in range(selectedBox.shape[0]): #range of result height
+                #for col in range(len(newResult)):
+                newResult[0] += selectedBox[row]
+        newResult = newResult.astype(float)
         #print(f"newResult: {newResult}")
         return newResult
             
