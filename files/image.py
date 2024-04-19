@@ -5,15 +5,11 @@ from PyQt6.QtWidgets import QRadioButton, QFileDialog, QCheckBox, QButtonGroup, 
 from PyQt6.QtWidgets import QLineEdit, QPushButton
 from PyQt6.QtGui import QMouseEvent, QPixmap, QPainter, QPen, QColor, QIntValidator
 from PyQt6.QtCore import Qt, QDir, QPoint
-from tifConv import tiffIm
+from tifConv import tiffIm, getInfo
 from energyVmomentum import EnergyVMomentum
 from PIL import Image, ImageQt
 import numpy as np
 import os, sys
-
-import matplotlib.pyplot as plt
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
 class ARPESGUI(QMainWindow):
     dir_path = ""  # Class variable to store the directory path
@@ -21,14 +17,16 @@ class ARPESGUI(QMainWindow):
     im = Image.fromarray(np.zeros((1,1)))
     startx = 0
     starty = 0
+    lastx = 0
+    lasty = 0
     
     def __init__(self):
         super().__init__()
         QGraphicsView.__init__(self, parent=None)
-        #self.setMouseTracking(True)
-
+        
         self.setWindowTitle("DeLTA Lab ARPES GUI")
         #self.setGeometry(100, 100, 800, 600)
+        self.tracking = False
 
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
@@ -39,21 +37,19 @@ class ARPESGUI(QMainWindow):
         layoutCol2Col1 = QVBoxLayout()
         layoutCol2Row1 = QHBoxLayout()
         layoutCol2Row2 = QHBoxLayout()
-
-        self.setup_ui(layoutCol1, layoutCol2, layoutCol2Col1, layoutCol2Row1, layoutCol2Row2)
+        layoutCol2Row3 = QHBoxLayout()
+        self.setup_ui(layoutCol1, layoutCol2, layoutCol2Col1, layoutCol2Row1, layoutCol2Row2, layoutCol2Row3)
         
         layoutRow1.addLayout(layoutCol1)
         layoutCol2Col1.addLayout(layoutCol2Row1)
         layoutCol2Col1.addLayout(layoutCol2Row2)
+        layoutCol2Col1.addLayout(layoutCol2Row3)
         layoutCol2.addLayout(layoutCol2Col1)
         layoutRow1.addLayout(layoutCol2)
         self.central_widget.setLayout(layoutRow1)
-        
-        self.last_x, self.last_y = None, None
-        self.pen_color = QColor('#000000')
 
     #setup the basic ui elements
-    def setup_ui(self, layoutCol1, layoutCol2, layoutCol2Col1, layoutCol2Row1, layoutCol2Row2):
+    def setup_ui(self, layoutCol1, layoutCol2, layoutCol2Col1, layoutCol2Row1, layoutCol2Row2, layoutCol2Row3):
         '''
         self.dir_path = self.getFolder()
         if not os.path.exists(self.dir_path):
@@ -67,25 +63,28 @@ class ARPESGUI(QMainWindow):
         tif = []
         for f in os.listdir(self.dir_path):
             if f.endswith('.TIF'):
+                #print(f)
                 tif.append(f)
             if f.endswith('.DAT'):
                 self.dat = f
             if f.endswith('.txt'):
                 self.energies = f
         tif = sorted(tif)
+        #print(len(tif))
+        tif.pop(0) #remove the first 0'th tif file which is just the sum of all
         self.tifArr = tiffIm(self.dir_path, tif)
+        #print(len(self.tifArr))
         
         #####should we check data to make sure images match with number in .DAT??
+        #if len(tif) > 0: blah blah blah
         
         # Add image placeholder
         self.image_label = QLabel("Tif Image Placeholder")
-        #if len(tif) > 0: blah blah blah
         
         self.im = Image.fromarray(self.tifArr[0])
         self.pixmap = QPixmap.fromImage(ImageQt.ImageQt(self.im)) #set image based on numpy array
-        
         self.image_label.setPixmap(self.pixmap)
-        self.resize(int(self.pixmap.width() / 2), int(self.pixmap.height() / 2))
+        #self.resize(int(self.pixmap.width() / 2), int(self.pixmap.height() / 2))
         layoutCol1.addWidget(QLabel("Tif Image"))
         layoutCol1.addWidget(self.image_label)
         
@@ -95,12 +94,20 @@ class ARPESGUI(QMainWindow):
         slider.valueChanged.connect(self.slider_value_changed) #on change, call slider_value_changed
         layoutCol1.addWidget(slider, stretch=1)  # Add the slider to the layout with stretch=1 to make it take full width
         
-        # Add radio buttons
-        self.checkbox = QCheckBox("Energies Map")
+        # Create a square button
+        submitButton = QPushButton("Submit")
+        submitButton.setFixedSize(200, 100)  # Set the fixed size of the button to create a square shape
+        submitButton.clicked.connect(self.interpl)
+        layoutCol2Row3.addWidget(submitButton)
         
-        self.buttonGroup = QButtonGroup()
-        self.radio_button1 = QRadioButton("Pick Two Points")
-        self.buttonGroup.addButton(self.radio_button1)
+        infoHead = getInfo(self.dir_path, self.dat)
+        #FILE_ID, EXPERIMENT_NAME, MEASUREMENT_NAME, TIMESTAMP, INSTITUTION, SAMPLE
+        #columnsToInclude = ['FILE_ID*', 'EXPERIMENT_NAME*', 'MEASUREMENT_NAME*', 'TIMESTAMP*', 'INSTITUTION*', 'SAMPLE*']
+        self.infoStr = infoHead.apply(lambda row: row.astype(str).values, axis=1)
+        #print(info[1])
+        infoHead = infoHead.to_string(index=False, header=False)
+        
+        self.info = QLabel(infoHead)
         
         self.textLineX = QLineEdit()
         self.textLineY = QLineEdit()
@@ -111,6 +118,7 @@ class ARPESGUI(QMainWindow):
         onlyInt = QIntValidator()
         onlyInt.setRange(0, 9)
         for w in coordWidgetList:
+            #w.setFixedWidth(15)
             w.setValidator(onlyInt)
             w.setMaxLength(4)
             if w == self.textLineX or w == self.textLineY:
@@ -129,21 +137,13 @@ class ARPESGUI(QMainWindow):
         self.textLineX.textEdited.connect(self.text_edited)
         self.textLineY.textEdited.connect(self.text_edited)
         
-        self.submitButton = QPushButton("Submit")
-        self.submitButton.clicked.connect(self.interpl)
-        
-        
-        layoutCol2.addWidget(self.radio_button1)
-        
-        controlWidgetList = [parenLabel, self.textLineX, commaLabel, self.textLineY]
-        controlWidgetList2 = [paren2Label, parenLabel2, self.textLineFinalX, commaLabel2, self.textLineFinalY, paren2Label2]
-
+        layoutCol2Row1.addWidget(self.info)
+        controlWidgetList = [parenLabel, self.textLineX, commaLabel, self.textLineY, paren2Label]
+        controlWidgetList2 = [parenLabel2, self.textLineFinalX, commaLabel2, self.textLineFinalY, paren2Label2]
         for w in controlWidgetList:
-            layoutCol2Row1.addWidget(w)
+            layoutCol2Row2.addWidget(w)
         for w in controlWidgetList2:
             layoutCol2Row2.addWidget(w)
-        
-        layoutCol2.addWidget(self.submitButton)
         
         
         
@@ -166,41 +166,50 @@ class ARPESGUI(QMainWindow):
 
     #(will updates the images) according to the slider value
     def slider_value_changed(self, i):
-        #print("Slider value changed")
-        #print(self.tifArr[i])
         self.im = Image.fromarray(self.tifArr[i])
         pixmap = QPixmap.fromImage(ImageQt.ImageQt(self.im)) #set image based on numpy array
         self.image_label.setPixmap(pixmap)
+        if (self.textLineX.text() != "" or self.textLineY.text() != "" or self.textLineFinalX.text() != "" or self.textLineFinalY.text() != ""):
+            self.makeLine((self.lastx, self.lasty))
     
+    #on click, start tracking
     def mousePressEvent(self, e):
-        #print("mouse press")
-        if (e.pos().x() - self.image_label.x() < 0 or e.pos().x() - self.image_label.x() > self.image_label.width() or e.pos().y() - self.image_label.y() < 0 or e.pos().y() - self.image_label.y() > self.image_label.height()):
+        if (e.pos().x() - self.image_label.x() < 0 or e.pos().x() - self.image_label.x() > self.image_label.width() 
+            or e.pos().y() - self.image_label.y() < 0 or e.pos().y() - self.image_label.y() > self.image_label.height()):
             return #return if not in bounds
-        pos = e.pos()
-        self.startx = pos.x() - self.image_label.x()
-        self.starty = pos.y() - self.image_label.y()
-        #if self.startx > int(self.image_label.x()) and self.startx < int(self.image_label.x()) + int(self.image_label.width() and self.starty > int(self.image_label.y()) and self.starty < int(self.image_label.y()) + int(self.image_label.height())):
+        self.tracking = True
+        self.startx = e.pos().x() - self.image_label.x()
+        self.starty = e.pos().y() - self.image_label.y()
+        
         self.image_label.setPixmap(QPixmap.fromImage(ImageQt.ImageQt(self.im)))
         self.textLineX.setText(str(self.startx))
         self.textLineY.setText(str(self.starty))
+    
+    #on release, stop tracking
+    def mouseReleaseEvent(self, e):
+        self.tracking = False
          
-
     #allow drag
     def mouseMoveEvent(self, e):
+        if not self.tracking: # no click.
+            return
         #print(e.pos().x() - self.image_label.x()) //this is the true position with respect to the picture
-        if (e.pos().x() - self.image_label.x() < 0 or e.pos().x() - self.image_label.x() > self.image_label.width() or e.pos().y() - self.image_label.y() < 0 or e.pos().y() - self.image_label.y() > self.image_label.height()):
+        if (e.pos().x() - self.image_label.x() < 0 or e.pos().x() - self.image_label.x() > self.image_label.width() 
+            or e.pos().y() - self.image_label.y() < 0 or e.pos().y() - self.image_label.y() > self.image_label.height()):
             return #return if not in bounds
-        pos = e.pos()
-        if self.last_x is None: # First event.
-            #print("no last_x")
-            self.last_x = pos.x()
-            self.last_y = pos.y()
-            return # Ignore the first time.
+        
         #later to keep the image from being redrawn gonna have to draw on a new pixmap, overlay, and save the drawing
         self.image_label.setPixmap(QPixmap.fromImage(ImageQt.ImageQt(self.im)))
+        self.makeLine((e.pos().x(), e.pos().y()))
+        self.lastx = e.pos().x()# - self.image_label.x()
+        self.lasty = e.pos().y()# - self.image_label.y()
         
-        self.makeLine(pos)
-        
+    #on text change, update the line
+    def text_edited(self, s):
+        if (self.textLineX.text() != "" and self.textLineY.text() != "" and self.textLineFinalX.text() != "" and self.textLineFinalY.text() != ""):
+            pos = (int(self.textLineX.text()), int(self.textLineY.text()))
+            self.image_label.setPixmap(QPixmap.fromImage(ImageQt.ImageQt(self.im)))
+            self.makeLine(pos)
         
     def makeLine(self, pos):
         painter = QPainter()
@@ -213,76 +222,108 @@ class ARPESGUI(QMainWindow):
         painter.setPen(pen)
         painter.device()
         
-        if ((pos.x() - self.image_label.x()) - self.startx) == 0:
-            painter.drawLine(int(self.image_label.x()), int(self.image_label.y()), int(self.image_label.x() + self.image_label.width()), int(self.image_label.y() + self.image_label.height()))
-        else:
-            slope = ((pos.y() - self.image_label.y()) - self.starty) / ((pos.x() - self.image_label.x()) - self.startx)
-            intersect = self.starty - slope * self.startx
-            finaly = slope * self.image_label.width() + intersect
-            #print("slope: " + str(slope))
-            #print("intersect: " + str(intersect))
-            painter.drawLine(int(self.image_label.x()), int(intersect), int(self.image_label.x() + self.image_label.width()), int(finaly))
+    
+        #print(f"pos: {pos.y() - self.image_label.y()}, {self.starty}")
+        if ((pos[0] - self.image_label.x()) - self.startx) == 0: #is verticle (note self.startx is local to image so we must make pos.x local)
+            painter.drawLine(int(pos[0]), 0, 
+                             int(pos[0]), int(self.image_label.height()))
+        else: #is not verticle
+            interceptY, rightMostY, intersectX, slope = self.getLineProp(pos[0], pos[1])
+            painter.drawLine(int(0), int(interceptY), int(self.image_label.width()), int(rightMostY)) #painter should be given local coord
         painter.end()
         
-        self.textLineFinalX.setText(str(pos.x() - self.image_label.x()))
-        self.textLineFinalY.setText(str(pos.y() - self.image_label.y()))
+        self.textLineFinalX.setText(str(pos[0] - self.image_label.x()))
+        self.textLineFinalY.setText(str(pos[1] - self.image_label.y()))
         
         self.image_label.setPixmap(pixmap)
         self.update()
-
-        # Update the origin for next time.
-        self.last_x = pos.x()
-        self.last_y = pos.y()
-        
-    def text_edited(self, s):
-        if (self.textLineX.text() != "" and self.textLineY.text() != "" and self.textLineFinalX.text() != "" and self.textLineFinalY.text() != ""):
-            pos = QPoint(int(self.textLineX.text()), int(self.textLineY.text()))
-            self.image_label.setPixmap(QPixmap.fromImage(ImageQt.ImageQt(self.im)))
-            self.makeLine(pos)
             
-            
-            
-    def getLine(self, startx, starty):
-        posn1 = QPoint(startx, starty)
-        
+    def getLineProp(self, posx, posy):
+        posn1 = QPoint(posx, posy) #global value since this is gained from mouse - this is last point dragged to
+        #y=mx+b
+        #x=(y-b)/m
+        #b=y-mx
+        #m=(y2-y1)/(x2-x1)
+        #print(f"posn1X {posn1.x()}, posn1Y {posn1.y()}, startx {self.startx}, starty {self.starty}")
         slope = ((posn1.y() - self.image_label.y()) - self.starty) / ((posn1.x() - self.image_label.x()) - self.startx)
-        intersect = self.starty - slope * self.startx
-        finaly = slope * self.image_label.width() + intersect
-        return QPoint(startx, starty), 
-            
-    def interpl(self):
-        if (self.textLineX.text() == "" or self.textLineY.text() == "" or self.textLineFinalX.text() == "" or self.textLineFinalY.text() == ""):
-            return
-        posn1 = QPoint(int(self.textLineX.text()), int(self.textLineY.text()))
-        posn2 = QPoint(int(self.textLineFinalX.text()), int(self.textLineFinalY.text()))
-        #where posn1 is the starting point and posn2 is the ending point=
-        x_new = np.linspace(posn1.x(), posn2.x(), len(self.tifArr))
-        #go through the list of tiffim (tifarr)
-        y_new = np.linspace(posn1.y(), posn2.y(), len(self.tifArr))
+        interceptY = self.starty - (slope * self.startx)
+        rightMostY = slope * (self.image_label.width() - self.image_label.x()) + interceptY
+        if slope == 0:
+            return interceptY, rightMostY, self.image_label.x(), slope
+        else:
+            intersectX = -interceptY / slope #from the top left corner
+            #print(f"intersectY {intersectY}, finalY {finalY}, intersectX {intersectX}, slope {slope}")
+            return interceptY, rightMostY, intersectX, slope
         
-        #check same size (they should always be the same size):
-        if len(x_new) != len(y_new):
-            print("error")
-            return
+            
+    def interpl(self): 
+        interceptY, rightMostY, intersectX, slope = self.getLineProp(int(self.textLineFinalX.text()), int(self.textLineFinalY.text()))
+        if (self.textLineX.text() == "" or self.textLineY.text() == "" or self.textLineFinalX.text() == "" or self.textLineFinalY.text() == ""):
+            return #make sure there is a line to interpolate
+        height = self.image_label.height() - 1
+        width = self.image_label.width() - 1
+        
+        #print(f"textX {self.textLineX.text()}, textY {self.textLineY.text()}")
+        #print(f"textFinalX {self.textLineFinalX.text()}, textFinalY {self.textLineFinalY.text()}")
+        #interceptY, rightMostY, intersectX, slope = self.getLineProp(int(self.textLineFinalX.text()), int(self.textLineFinalY.text()))
+        #print(f"intersectY {interceptY}, rightMostY {rightMostY}, intersectX {intersectX}, slope {slope}")
+        
+        rightmostY = max(min(rightMostY, height), 0)
+        leftmostY = max(min(interceptY, height), 0)
+        if slope == 0:
+            leftmostX = 0
+            rightmostX = width
+        else:
+            leftmostX = max(min((leftmostY-interceptY) / slope, width), 0)
+            rightmostX = max(min((rightmostY-interceptY) / slope, width), 0)       
+            
+        #y=mx+b
+        #x=(y-b)/m
+        #posn1 = QPoint(int(min(leftmostX, rightmostX)), int(min(leftmostY, rightmostY)))
+        #posn2 = QPoint(int(max(leftmostX, rightmostX)), int(max(leftmostY, rightmostY)))
+        posn1 = QPoint(int(leftmostX), int(leftmostY))
+        posn2 = QPoint(int(rightmostX), int(rightmostY))
+        #where posn1 is the starting point and posn2 is the ending point
+        #print(posn1, posn2)
+        
+        length = np.sqrt((posn2.x() - posn1.x())**2 + (posn2.y() - posn1.y())**2)
+        #print(f"length: {length}")
+        
+        xlen = int(length)
+        ylen = len(self.tifArr)
+        x_new = np.linspace(posn1.x(), posn2.x(), xlen)
+        y_new = np.linspace(posn1.y(), posn2.y(), xlen)
+        #print(x_new, y_new)
+        
+        #maybe add some checks here to dumbproof
+        
+        #print(f"tiffIm: {self.tifArr[70][int(x_new[0])][int(y_new[0])]}")
         
         #only return those points in the array which align with x_new and y_new
-        result = np.zeros(shape = (len(self.tifArr), len(self.tifArr)))
-        index = 0
+        result = np.zeros(shape = (ylen, xlen)) #this will eventually be converted to image so should be height by width
+        #print(f"resultshape: {result.shape}")
+        #print(f"resultshape: {result.shape}")
+        imIndex = 0
         for tiffIm in self.tifArr:
-            for i in range(len(result[0])):
-                result[index][i] = int(tiffIm[int(x_new[i])][int(y_new[i])])
+            for x in range(result.shape[1]):
+                #print(f"tiffIm: {tiffIm[int(x_new[i])][int(y_new[i])]}")
+                result[imIndex][x] = int(tiffIm[int(x_new[x])][int(y_new[x])])
                 #result, get say first row, then populate that first row
                 #with tiffIm's points at x_new[i] and y_new[i]
-            index += 1
-        result = result.astype(np.uint8)
+            imIndex += 1
+        #result = result.astype(np.uint8)
+        result = result.astype(float)
+        
+        #print(f"result: {result}")
         
         self.showNewImage(result)
         return
     
     def showNewImage(self, result):
         #print("result")
-       #print(result)
-        self.w = EnergyVMomentum(result)
+        #print(result)
+        #print(type(self.info))
+        self.w = EnergyVMomentum(result, self.dir_path, self.tifArr, self.dat, self.infoStr)
         #w.result = result
         self.w.show()
         
