@@ -7,13 +7,14 @@ from distributionCurve import DistCrve
 from tifConv import getEnergies
 from commonWidgets import saveButtonCom, saveFileCom, errorDialogueCom, configureGraphCom, setupFigureCom, resetButtonCom
 
-
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 """
 This "window" is a QWidget. If it has no parent, it
 will appear as a free-floating window as we want.
 """
 class EnergyVMomentum(QWidget):
-    def __init__(self, results, path, tifArr, dat, info):
+    def __init__(self, results, path, tifArr, dat):
         super().__init__()
         QGraphicsView.__init__(self, parent=None)
         #setup variables
@@ -22,11 +23,15 @@ class EnergyVMomentum(QWidget):
         self.starty = None
         self.lastx = None
         self.lasty = None
+        self.datax = None
+        self.datay = None
+        self.dataLastx = None
+        self.dataLasty = None
         self.tracking = False
         self.path = path
         self.tifArr = tifArr
         self.dat = dat
-        self.info = info
+        #self.info = info
         self.energiesLow = None
         self.energiesHigh = None
         
@@ -39,8 +44,6 @@ class EnergyVMomentum(QWidget):
         self.layoutRow1 = QHBoxLayout()
         self.layoutCol1 = QVBoxLayout()
         self.layoutCol2 = QVBoxLayout()
-        self.label = QLabel("Another Window")
-        self.layoutCol1.addWidget(self.label)
         #setupUI
         self.setupUI()
         #finialize layout
@@ -73,25 +76,38 @@ class EnergyVMomentum(QWidget):
         self.canvas.mpl_connect('button_release_event', self.plotMouseRelease)
         
         self.show()
+        self.ax = self.figure.add_subplot(111)
         self.buildEM()
         
         #setup reset button
         resetButtonCom(self)
-        self.layoutCol2.addWidget(self.resetButton)
+        self.layoutCol1.addWidget(self.resetButton)
     
     #resets the line
     def resetLine(self):
+        #self.figure = Figure()
+        #self.canvas = FigureCanvas(self.figure)
+        #self.figure.clf()
+        self.ax.cla()
+        self._plot_ref[0] = None
         self.buildEM()
-        self.resetButton.hide()
-        self.update()
+        self.resetButton.setStyleSheet("color : rgba(0, 0, 0, 0); background-color : rgba(0, 0, 0, 0); border : 0px solid rgba(0, 0, 0, 0);")
+        #self.resetButton.hide()
+        #self.update()
         
     #start point on click
     def plotMouseClick(self, e):
-        self.resetButton.show()
+        #self.resetButton.show()
+        self.resetButton.setStyleSheet("")
         self.tracking = not self.tracking
         if e.inaxes:
             self.startx = e.xdata
             self.starty = e.ydata
+            self.datax = e.x
+            self.datay = e.y
+        #print(f"startx: {self.startx}, starty: {self.starty}")
+        #print(f"datax: {self.datax}, starty: {self.datay}")
+            
             
     #allow drag
     def plotMouseMove(self, e):
@@ -101,6 +117,8 @@ class EnergyVMomentum(QWidget):
             pos = (e.xdata, e.ydata)
             self.lastx = e.xdata
             self.lasty = e.ydata
+            self.dataLastx = e.x
+            self.dataLasty = e.y
             self.createArea(pos)
     
     #release stop tracking
@@ -109,8 +127,7 @@ class EnergyVMomentum(QWidget):
         
     #build EM plot
     def buildEM(self):
-        self.ax = self.figure.add_subplot(111)
-        self.ax.clear() # discards the old graph
+        #self.ax.clear() # discards the old graph
         #get data
         energies = getEnergies(self.path, self.dat)
         #set range and plot
@@ -187,8 +204,18 @@ class EnergyVMomentum(QWidget):
         else:
             type = "MDC"
         #create new window
-        self.w = DistCrve(self.result, self.tifArr, self.dat, type, (self.startx, self.starty), 
-                          (self.lastx, self.lasty), self.energiesLow, self.energiesHigh)
+        if(self.datax is None or self.datay is None or self.dataLastx is None or self.dataLasty is None):
+            print("no box")
+            self.datax = 0
+            self.datay = self.result.shape[0]
+            self.dataLastx = self.energiesLow
+            self.dataLasty = self.energiesHigh
+        #print(f"startx: {self.datax}, starty: {self.datay}, lastx: {self.dataLastx}, lasty: {self.dataLasty}")
+        print(f"startx: {self.startx}, starty: {self.starty}, lastx: {self.lastx}, lasty: {self.lasty}")
+        self.w = DistCrve(self.result, type, 
+                          (self.startx, self.starty), (self.lastx, self.lasty), 
+                          #(self.datax, self.datay), (self.dataLastx, self.dataLasty), 
+                          self.energiesLow, self.energiesHigh)
         self.w.show()
          
     #save the file

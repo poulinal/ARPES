@@ -55,14 +55,14 @@ class ARPESGUI(QMainWindow):
     #setup the basic ui elements
     def setupUI(self):
         #get the directory path
-        '''
+        #'''
         self.dir_path = self.getFolder()
         if not os.path.exists(self.dir_path):
             print("not a valid directory")
             sys.exit()
-            '''
+            #'''
         #while testing:
-        self.dir_path = '/Users/alexpoulin/Downloads/git/ARPES/exData/Sum'
+        #self.dir_path = '/Users/alexpoulin/Downloads/git/ARPES/exData/Sum'
 
         #get data from directory
         tif = []
@@ -81,6 +81,7 @@ class ARPESGUI(QMainWindow):
         '''we should keep in mind that not all may have a sum file, so we should check for that'''
         self.tifArr = tiffIm(self.dir_path, tif)
         
+        #print(self.tifArr)
         
         #generate image
         self.image_label = QLabel("Tif Image Placeholder")
@@ -106,12 +107,8 @@ class ARPESGUI(QMainWindow):
         self.layoutCol2Row3.addWidget(submitButton)
         
         #setup infoHead
-        infoHead = getInfo(self.dir_path, self.dat)
-        #FILE_ID, EXPERIMENT_NAME, MEASUREMENT_NAME, TIMESTAMP, INSTITUTION, SAMPLE
-        #columnsToInclude = ['FILE_ID*', 'EXPERIMENT_NAME*', 'MEASUREMENT_NAME*', 'TIMESTAMP*', 'INSTITUTION*', 'SAMPLE*']
-        self.infoStr = infoHead.apply(lambda row: row.astype(str).values, axis=1)
-        infoHead = infoHead.to_string(index=False, header=False)
-        self.info = QLabel(infoHead)
+        self.info = QLabel(self.getInfo())
+        self.info.setStyleSheet("border: 1px solid white;")
         
         #setup lineCoords
         self.textLineX = QLineEdit()
@@ -167,8 +164,20 @@ class ARPESGUI(QMainWindow):
         self.textLineFinalX.setText("")
         self.textLineFinalY.setText("")
         self.image_label.setPixmap(QPixmap.fromImage(ImageQt.ImageQt(self.im)))
-        self.resetButton.hide()
+        self.resetButton.setStyleSheet("color : rgba(0, 0, 0, 0); background-color : rgba(0, 0, 0, 0); border : 0px solid rgba(0, 0, 0, 0);")
+        #self.resetButton.hide()
         self.update()
+        
+    #get infohead
+    def getInfo(self):
+        infoHead = getInfo(self.dir_path, self.dat)
+        #print(f"infoHead: \n {infoHead}, \n {type(infoHead)}")
+        #FILE_ID, EXPERIMENT_NAME, MEASUREMENT_NAME, TIMESTAMP, INSTITUTION, SAMPLE
+        #columnsToInclude = ['FILE_ID*', 'EXPERIMENT_NAME*', 'MEASUREMENT_NAME*', 'TIMESTAMP*', 'INSTITUTION*', 'SAMPLE*']
+        #self.infoStr = infoHead.apply(lambda row: row.astype(str).values, axis=1) #this is an ndArray
+        #print(f"infoStr: \n {self.infoStr[0]}, \n {type(self.infoStr)}")
+        infoHead = infoHead.to_string(index=False, header=False)
+        return infoHead
 
     #(will updates the images) according to the slider value
     def slider_value_changed(self, i):
@@ -181,7 +190,8 @@ class ARPESGUI(QMainWindow):
     
     #on click, start tracking
     def mousePressEvent(self, e):
-        self.resetButton.show()
+        #self.resetButton.show()
+        self.resetButton.setStyleSheet("")
         if (e.pos().x() - self.image_label.x() < 0 or e.pos().x() - self.image_label.x() > self.image_label.width() 
             or e.pos().y() - self.image_label.y() < 0 or e.pos().y() - self.image_label.y() > self.image_label.height()):
             return #return if not in bounds
@@ -297,7 +307,7 @@ class ARPESGUI(QMainWindow):
         #print("result")
         #print(result)
         #print(type(self.info))
-        self.w = EnergyVMomentum(result, self.dir_path, self.tifArr, self.dat, self.infoStr)
+        self.w = EnergyVMomentum(result, self.dir_path, self.tifArr, self.dat)
         #w.result = result
         self.w.show()
         

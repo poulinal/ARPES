@@ -3,7 +3,8 @@ from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
 from PyQt6.QtWidgets import QGraphicsView, QPushButton
 import numpy as np
 
-from commonWidgets import saveButtonCom, saveFileCom, errorDialogueCom, configureGraphCom, setupFigureCom
+from commonWidgets import saveButtonCom, saveFileCom, errorDialogueCom
+from commonWidgets import configureGraphCom, setupFigureCom, remap, rescale
 
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
@@ -17,7 +18,7 @@ class DistCrve(QWidget):
     """
     #result = np.zeros((50,50))
     
-    def __init__(self, results, tifArr, dat, type, posStart, posEnd, energiesLow, energiesHigh):
+    def __init__(self, results, type, posStart, posEnd, energiesLow, energiesHigh):
         super().__init__()
         QGraphicsView.__init__(self, parent=None)
         #init variables
@@ -26,18 +27,19 @@ class DistCrve(QWidget):
         self.energiesLow = energiesLow
         self.energiesHigh = energiesHigh
         self.type = type
-        self.dat = dat
+        self.posStart = posStart
+        self.posEnd = posEnd
         #set up the box selection
-        if (posStart[0] is None or posStart[1] is None or posEnd[0] is None or posEnd[1] is None):
-            self.posStart = posStart
-            self.posEnd = posEnd
+        if (self.posStart[0] is None or self.posStart[1] is None or self.posEnd[0] is None or self.posEnd[1] is None):
+            self.datPosStart = self.posStart
+            self.datPosEnd = self.posEnd
         else:
-            self.posStart = (posStart[0], self.remap(posStart[1], 
-                                                     self.energiesLow, self.energiesHigh, 
-                                                     0, self.result.shape[0]))
-            self.posEnd = (posEnd[0], self.remap(posEnd[1], 
-                                                 self.energiesLow, self.energiesHigh, 
-                                                 0, self.result.shape[0]))
+            self.datPosStart = (self.posStart[0], remap(self.posStart[1], 
+                                                self.energiesLow, self.energiesHigh, 
+                                                0, self.result.shape[0]))
+            self.datPosEnd = (self.posEnd[0], remap(self.posEnd[1], 
+                                            self.energiesLow, self.energiesHigh, 
+                                            0, self.result.shape[0]))
         #set up window
         self.setWindowTitle(type)
         self.layoutRow1 = QHBoxLayout()
@@ -64,33 +66,29 @@ class DistCrve(QWidget):
         self.buildDC()
         self.configureGraph()
         
-    #remaps to the energy range
-    def remap(self, value, start1, stop1, start2, stop2):
-        # Scale input value from the original range to a value between 0 and 1
-        normalized_value = (value - start1) / (stop1 - start1)
-        # Scale the normalized value to the new range
-        return start2 + normalized_value * (stop2 - start2)
-        
     #builds the distribution curve
     def buildDC(self):
         self.ax = self.figure.add_subplot(111) #add subplot
         self.ax.clear() #clear any old ones
         self.newResult = self.configureType() #get data
+        #self.newResult = rescale(self.newResult, self.posStart[1], self.posEnd[1]) #rescale
+        #y = rescale(self.newResult[0], self.posStart[1], self.posEnd[1])
         self.ax.plot(self.newResult[0], '-') #plot
         self.canvas.draw() #redraw
         
     #configures the graph 
     def configureGraph(self):
-        configureGraphCom(self, self.type, 'Space', 'Intensity')
+        configureGraphCom(self, self.type, 'Intensity', '')
     
     #configures the type of distribution curve    
     def configureType(self):
         #get the points based on box selection
-        if self.posStart[0] is None or self.posStart[1] is None or self.posEnd[0] is None or self.posEnd[1] is None: #get full image
+        if self.datPosStart[0] is None or self.datPosStart[1] is None or self.datPosEnd[0] is None or self.datPosEnd[1] is None: #get full image
             selectedBox = self.result
         else:
-            selectedBox = self.result[int(min(self.posStart[1], self.posEnd[1])): int(max(self.posStart[1], self.posEnd[1])), 
-                                      int(min(self.posStart[0], self.posEnd[0])): int(max(self.posStart[0], self.posEnd[0]))]
+            selectedBox = self.result[int(min(self.datPosStart[1], self.datPosEnd[1])): int(max(self.datPosStart[1], self.datPosEnd[1])), 
+                                      int(min(self.datPosStart[0], self.datPosEnd[0])): int(max(self.datPosStart[0], self.datPosEnd[0]))]
+        #print(f"selectedBox: {selectedBox}")
         #now integrate based on type
         if self.type == "EDC": #EDC integration over x
             newResult = np.zeros(shape = (1, selectedBox.shape[0]))
