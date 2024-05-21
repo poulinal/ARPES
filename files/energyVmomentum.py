@@ -76,7 +76,7 @@ class EnergyVMomentum(QWidget):
         self.canvas.mpl_connect('button_release_event', self.plotMouseRelease)
         
         self.show()
-        self.ax = self.figure.add_subplot(111)
+        #self.ax = self.figure.add_subplot(111)
         self.buildEM()
         
         #setup reset button

@@ -1,4 +1,5 @@
 from PyQt6.QtWidgets import QFileDialog, QMessageBox, QPushButton
+from PyQt6.QtCore import QDir
 
 import numpy as np
 import os, sys
@@ -63,9 +64,9 @@ def configureGraphCom(self, type, x, y):
     self.ax.set_ylabel(y)
     
     self.figure.tight_layout()
-    self.figure.patch.set_facecolor('white')
-    self.figure.patch.set_alpha(0)
-    self.canvas.setStyleSheet("background-color:transparent;")
+    #self.figure.patch.set_facecolor('white')
+    #self.figure.patch.set_alpha(0)
+    #self.canvas.setStyleSheet("background-color:transparent;")
     self.ax.spines["top"].set_color("white")
     self.ax.spines["bottom"].set_color("white")
     self.ax.spines["left"].set_color("white")
@@ -85,6 +86,18 @@ def setupFigureCom(self):
     # it takes the `figure` instance as a parameter to __init__
     self.canvas = FigureCanvas(self.figure)
     
+    widthPixels = 2080
+    heightPixels = 810
+    dpi = self.figure.get_dpi()
+    widthInches = widthPixels / dpi
+    heightInches = heightPixels / dpi
+    self.figure.set_size_inches(widthInches, heightInches)
+
+    self.figure.patch.set_facecolor('white')
+    self.figure.patch.set_alpha(0)
+    self.canvas.setStyleSheet("background-color:transparent;")
+    self.ax = self.figure.add_subplot(111)
+    
 def resetButtonCom(self):
     # Create a square button
     self.resetButton = QPushButton("Reset Line")
@@ -92,3 +105,13 @@ def resetButtonCom(self):
     self.resetButton.clicked.connect(self.resetLine)
     #self.resetButton.hide()
     self.resetButton.setStyleSheet("color : rgba(0, 0, 0, 0); background-color : rgba(0, 0, 0, 0); border : 0px solid rgba(0, 0, 0, 0);")
+
+#returns the path of the folder selected by the user
+def getFolder(self):
+    #print("Get folder")
+    dir_path = QFileDialog.getExistingDirectory(
+        #parent=self,
+        caption="Select directory",
+        directory=QDir().homePath(),
+        options=QFileDialog.Option.DontUseNativeDialog)
+    return dir_path

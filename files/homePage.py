@@ -1,0 +1,66 @@
+from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QLabel, QSizePolicy, QGridLayout
+from PyQt6.QtGui import QIcon, QPixmap
+from PyQt6.QtCore import QSize
+
+from image import ARPESGUI
+from xps import XPSGUI
+
+class HOMEGUI(QMainWindow):
+    def __init__(self):
+        super().__init__()
+
+        # Set window title
+        self.setWindowTitle("DeLTA Home Page")
+        #self.setGeometry(100, 100, 800, 600)
+
+        # Create central widget and layout
+        self.central_widget = QWidget()
+        self.setCentralWidget(self.central_widget)
+        layout = QGridLayout()
+
+        # Create left button with image
+        arpesButton = QPushButton()
+        arpesButton.setIcon(QIcon('/Users/alexpoulin/Downloads/git/ARPES/files/images/arpesDemo.png'))  # Set left picture
+        #print(arpesButton.sizeHint())
+        arpesButton.clicked.connect(self.arpesButtonClicked)  # Connect click signal
+        #arpesButton.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        #arpesButton.setFixedSize(500,500)
+        layout.addWidget(arpesButton, 0, 0, 3, 1)
+        arpesButton.setIconSize(QSize(arpesButton.size()))  # Set icon size to button size
+        #print(self.central_widget.sizeHint().width, self.central_widget.sizeHint().height)
+
+
+        # Create right button with image
+        xpsButton = QPushButton()
+        xpsButton.setIcon(QIcon('/Users/alexpoulin/Downloads/git/ARPES/files/images/xpsDemo.png'))  # Set right picture
+        xpsButton.clicked.connect(self.xpsButtonClicked)  # Connect click signal
+        layout.addWidget(xpsButton, 0, 1, 3, 1)
+        xpsButton.setIconSize(xpsButton.size())  # Set icon size to button size
+
+        
+        self.central_widget.setLayout(layout)
+
+    def arpesButtonClicked(self):
+        print("Left button clicked")
+        self.w = ARPESGUI()
+        self.w.show()
+
+    def xpsButtonClicked(self):
+        print("Right button clicked")
+        self.w = XPSGUI()
+        self.w.show()
+        
+        '''
+class ArpesButton(QWidget):
+    def __init__(self, *args):
+        super().__init__(*args)
+        
+        # Create left button with image
+        arpesButton = QPushButton()
+        arpesButton.setIcon(QIcon('/Users/alexpoulin/Downloads/git/ARPES/files/images/arpesDemo.png'))  # Set left picture
+        #print(arpesButton.sizeHint())
+        arpesButton.clicked.connect(self.arpesButtonClicked)  # Connect click signal
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        arpesButton.setIconSize(QSize(arpesButton.sizeHint()))  # Set icon size to button size
+        #print(self.central_widget.sizeHint().width, self.central_widget.sizeHint().height)
+        '''

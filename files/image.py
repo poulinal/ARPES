@@ -10,7 +10,10 @@ from energyVmomentum import EnergyVMomentum
 from PIL import Image, ImageQt
 import numpy as np
 import os, sys
-from commonWidgets import resetButtonCom
+from commonWidgets import resetButtonCom, setupFigureCom, configureGraphCom
+import buildImage
+import fileWork
+from tifConv import getEnergies
 
 class ARPESGUI(QMainWindow):
     def __init__(self):
@@ -20,12 +23,15 @@ class ARPESGUI(QMainWindow):
         #setup variables
         self.dir_path = ""  # Class variable to store the directory path
         self.tifArr = []  # Class variable to store the tiff images as an array
-        self.im = Image.fromarray(np.zeros((1,1)))
-        self.startx = 0
-        self.starty = 0
-        self.lastx = 0
-        self.lasty = 0
+        self.startx = None
+        self.starty = None
+        self.lastx = None
+        self.lasty = None
         self.tracking = False
+        self.lastIm = 0
+        self.vmin = None
+        self.vmax = None
+        self._plot_ref = [None, None] #first is main plot, second is line
 
         # Set up the main window
         self.setWindowTitle("DeLTA Lab ARPES GUI")
@@ -40,6 +46,8 @@ class ARPESGUI(QMainWindow):
         self.layoutCol2Row2 = QHBoxLayout()
         self.layoutCol2Row3 = QHBoxLayout()
         self.layoutCol2Row4 = QHBoxLayout()
+        self.layoutCol2Row5 = QHBoxLayout()
+        self.layoutCol2Row6 = QHBoxLayout()
         #setup the UI
         self.setupUI()
         #finalize layout
@@ -48,47 +56,31 @@ class ARPESGUI(QMainWindow):
         self.layoutCol2Col1.addLayout(self.layoutCol2Row2)
         self.layoutCol2Col1.addLayout(self.layoutCol2Row3)
         self.layoutCol2Col1.addLayout(self.layoutCol2Row4)
+        self.layoutCol2Col1.addLayout(self.layoutCol2Row5)
+        self.layoutCol2.addLayout(self.layoutCol2Row6)
         self.layoutCol2.addLayout(self.layoutCol2Col1)
         layoutRow1.addLayout(self.layoutCol2)
         self.central_widget.setLayout(layoutRow1)
 
     #setup the basic ui elements
     def setupUI(self):
-        #get the directory path
-        #'''
-        self.dir_path = self.getFolder()
-        if not os.path.exists(self.dir_path):
-            print("not a valid directory")
-            sys.exit()
-            #'''
-        #while testing:
-        #self.dir_path = '/Users/alexpoulin/Downloads/git/ARPES/exData/Sum'
-
-        #get data from directory
-        tif = []
-        for f in os.listdir(self.dir_path):
-            if f.endswith('.TIF'):
-                #print(f)
-                tif.append(f)
-            if f.endswith('.DAT'):
-                self.dat = f
-            if f.endswith('.txt'):
-                self.energies = f
-        tif = sorted(tif)
-        #####should we check data to make sure images match with number in .DAT??
-        #if len(tif) > 0: blah blah blah
-        tif.pop(0) #remove the first 0'th tif file which is just the sum of all
-        '''we should keep in mind that not all may have a sum file, so we should check for that'''
+        files = fileWork.files()
+        self.dir_path = files.dir_path
+        self.dat = files.dat
+        #self.energies = files.energies
+        tif = files.tif
         self.tifArr = tiffIm(self.dir_path, tif)
+        
+        self.energyArr = getEnergies(self.dir_path, self.dat)
         
         #print(self.tifArr)
         
-        #generate image
-        self.image_label = QLabel("Tif Image Placeholder")
-        self.im = Image.fromarray(self.tifArr[0])
-        self.pixmap = QPixmap.fromImage(ImageQt.ImageQt(self.im)) #set image based on numpy array
-        self.image_label.setPixmap(self.pixmap)
-        self.layoutCol1.addWidget(self.image_label)
+        setupFigureCom(self)
+        self.imageBuilder = buildImage.ImageBuilder()
+        self.imageBuilder.buildImage(self, 0)
+        self.ax.axis('off')  # Turn off axes
+        self.ax.autoscale(False)
+        self.layoutCol1.addWidget(self.canvas)
         
         #add slider to slide through images
         slider = QSlider(Qt.Orientation.Horizontal) #create new horizontal slider
@@ -98,17 +90,23 @@ class ARPESGUI(QMainWindow):
         
         #setup resetbutton
         resetButtonCom(self)
-        self.layoutCol2Row4.addWidget(self.resetButton)
+        self.layoutCol2Row6.addWidget(self.resetButton)
         
         #setup submit button
         submitButton = QPushButton("Submit")
         submitButton.setFixedSize(200, 100)  # Set the fixed size of the button to create a square shape
         submitButton.clicked.connect(self.interpl)
-        self.layoutCol2Row3.addWidget(submitButton)
+        self.layoutCol2Row5.addWidget(submitButton)
         
         #setup infoHead
         self.info = QLabel(self.getInfo())
         self.info.setStyleSheet("border: 1px solid white;")
+        #current energy level
+        self.currentEnergy = QLabel(f"Current Energy Level: {self.energyArr[0]}")
+        self.setupCurEnergy(0)
+        self.layoutCol2Row1.addWidget(self.info)
+        self.layoutCol2Row2.addWidget(self.currentEnergy)
+        
         
         #setup lineCoords
         self.textLineX = QLineEdit()
@@ -136,26 +134,41 @@ class ARPESGUI(QMainWindow):
         paren2Label2 = QLabel(")")
         commaLabel2 = QLabel(",")
         #add it to layout
-        self.layoutCol2Row1.addWidget(self.info)
         controlWidgetList = [parenLabel, self.textLineX, commaLabel, self.textLineY, paren2Label]
         controlWidgetList2 = [parenLabel2, self.textLineFinalX, commaLabel2, self.textLineFinalY, paren2Label2]
         for w in controlWidgetList:
-            self.layoutCol2Row2.addWidget(w)
+            self.layoutCol2Row3.addWidget(w)
         for w in controlWidgetList2:
-            self.layoutCol2Row2.addWidget(w)
+            self.layoutCol2Row3.addWidget(w)
         
+        # Create sliders
+        self.slider_left = QSlider(Qt.Orientation.Horizontal)
+        self.slider_right = QSlider(Qt.Orientation.Horizontal)
+
+        # Set slider ranges
+        self.slider_left.setMinimum(0)
+        self.slider_left.setMaximum(6499)
+        self.slider_right.setMinimum(150000)
+        self.slider_right.setMaximum(350000)
+
+        # Create labels to display slider values
+        self.label_left = QLabel("Left: 0")
+        self.label_right = QLabel("Right: 100")
+
+        # Add widgets to layout
+        self.layoutCol2Row4.addWidget(self.slider_left)
+        self.layoutCol2Row4.addWidget(self.slider_right)
+        self.layoutCol2Row4.addWidget(self.label_left)
+        self.layoutCol2Row4.addWidget(self.label_right)
+
+        # Connect signals
+        self.slider_left.valueChanged.connect(self.update_label_left)
+        self.slider_right.valueChanged.connect(self.update_label_right)
         
-        
-    #returns the path of the folder selected by the user
-    def getFolder(self):
-        #print("Get folder")
-        dir_path = QFileDialog.getExistingDirectory(
-            parent=self,
-            caption="Select directory",
-            directory=QDir().homePath(),
-            options=QFileDialog.Option.DontUseNativeDialog,
-        )
-        return dir_path
+        # Connect the mouse events
+        self.canvas.mpl_connect('button_press_event', self.plotMouseClick)
+        self.canvas.mpl_connect('motion_notify_event', self.plotMouseMove)
+        self.canvas.mpl_connect('button_release_event', self.plotMouseRelease)
     
     #resets the line
     def resetLine(self):
@@ -178,125 +191,122 @@ class ARPESGUI(QMainWindow):
         #print(f"infoStr: \n {self.infoStr[0]}, \n {type(self.infoStr)}")
         infoHead = infoHead.to_string(index=False, header=False)
         return infoHead
+    
+    def setupCurEnergy(self, num):
+        self.currentEnergy.setText(f"Current Energy Level: {self.energyArr[num]}")
 
     #(will updates the images) according to the slider value
     def slider_value_changed(self, i):
-        self.im = Image.fromarray(self.tifArr[i])
-        pixmap = QPixmap.fromImage(ImageQt.ImageQt(self.im)) #set image based on numpy array
-        self.image_label.setPixmap(pixmap)
-        #keep line if it exists
-        if (self.textLineX.text() != "" or self.textLineY.text() != "" or self.textLineFinalX.text() != "" or self.textLineFinalY.text() != ""):
+        self.lastIm = i
+        self.imageBuilder.buildImage(self, self.lastIm)
+        self.setupCurEnergy(i)
+        '''
+        if (self.lastx is not None and self.lasty is not None):
             self.makeLine((self.lastx, self.lasty))
+            '''
+            
+    def update_label_left(self, value):
+        self.vmin = value / 100
+        self.label_left.setText(f"Left: {self.vmin}")
+        #self.slider_right.setMinimum(value)
+        #self._plot_ref[0].set_clim(vmin=self.vmin)
+        self.imageBuilder.buildImage(self, self.lastIm)
+        #self.update()
     
-    #on click, start tracking
-    def mousePressEvent(self, e):
+    def update_label_right(self, value):
+        self.vmax = value / 100
+        self.label_right.setText(f"Right: {self.vmax}")
+        #self._plot_ref[0].set_clim(vmax=self.vmax)
+        self.imageBuilder.buildImage(self, self.lastIm)
+        #self.slider_left.setMaximum(value - 1)
+        #self.update()
+    
+    #start point on click
+    def plotMouseClick(self, e):
         #self.resetButton.show()
-        self.resetButton.setStyleSheet("")
-        if (e.pos().x() - self.image_label.x() < 0 or e.pos().x() - self.image_label.x() > self.image_label.width() 
-            or e.pos().y() - self.image_label.y() < 0 or e.pos().y() - self.image_label.y() > self.image_label.height()):
-            return #return if not in bounds
-        self.tracking = True
-        self.startx = e.pos().x() - self.image_label.x()
-        self.starty = e.pos().y() - self.image_label.y()
-        
-        self.image_label.setPixmap(QPixmap.fromImage(ImageQt.ImageQt(self.im)))
-        self.textLineX.setText(str(self.startx))
-        self.textLineY.setText(str(self.starty))
-    
-    #on release, stop tracking
-    def mouseReleaseEvent(self, e):
-        self.tracking = False
+        #self.resetButton.setStyleSheet("")
+        self.tracking = not self.tracking
+        if e.inaxes:
+            self.startx = e.xdata
+            self.starty = e.ydata
+        #print(f"startx: {self.startx}, starty: {self.starty}")
          
-    #allow drag
-    def mouseMoveEvent(self, e):
-        if not self.tracking: # no click.
-            return
-        #print(e.pos().x() - self.image_label.x()) //this is the true position with respect to the picture
-        if (e.pos().x() - self.image_label.x() < 0 or e.pos().x() - self.image_label.x() > self.image_label.width() 
-            or e.pos().y() - self.image_label.y() < 0 or e.pos().y() - self.image_label.y() > self.image_label.height()):
-            return #return if not in bounds
-        
-        self.image_label.setPixmap(QPixmap.fromImage(ImageQt.ImageQt(self.im)))
-        self.makeLine((e.pos().x(), e.pos().y()))
-        self.lastx = e.pos().x()
-        self.lasty = e.pos().y()
+    def plotMouseMove(self, e):
+        if e.inaxes and self.tracking:
+            #print("inaxes")
+            pos = (e.xdata, e.ydata)
+            self.lastx = e.xdata
+            self.lasty = e.ydata
+            self.makeLine(pos)
+            #print(f"lastx: {self.lastx}, lasty: {self.lasty}")
+            
+    #release stop tracking
+    def plotMouseRelease(self, e):
+        self.tracking = False
         
     #on text change, update the line
     def text_edited(self, s):
-        if (self.textLineX.text() != "" and self.textLineY.text() != "" and self.textLineFinalX.text() != "" and self.textLineFinalY.text() != ""):
-            pos = (int(self.textLineX.text()), int(self.textLineY.text()))
-            self.image_label.setPixmap(QPixmap.fromImage(ImageQt.ImageQt(self.im)))
-            self.makeLine(pos)
+        if (self.lastx is not None and self.lasty is not None):
+            #self.image_label.setPixmap(QPixmap.fromImage(ImageQt.ImageQt(self.im)))
+            self.lastx = int(self.textLineFinalX.text())
+            self.lasty = int(self.textLineFinalY.text())
+            self.makeLine((self.lastx, self.lasty))
     
     #draws the line  
     def makeLine(self, pos):
-        painter = QPainter()
-        pixmap = self.image_label.pixmap()
-        painter.begin(pixmap)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        pen = QPen()
-        pen.setColor(QColor('yellow'))
-        pen.setWidth(3)  # Increase the width of the pen to 3
-        painter.setPen(pen)
-        painter.device()
-
-        if ((pos[0] - self.image_label.x()) - self.startx) == 0: #is verticle (note self.startx is local to image so we must make pos.x local)
-            painter.drawLine(int(pos[0]), 0, 
-                             int(pos[0]), int(self.image_label.height()))
-        else: #is not verticle
-            interceptY, rightMostY, intersectX, slope = self.getLineProp(pos[0], pos[1])
-            painter.drawLine(int(0), int(interceptY), int(self.image_label.width()), int(rightMostY)) #painter should be given local coord
-        painter.end()
-        
-        self.textLineFinalX.setText(str(pos[0] - self.image_label.x()))
-        self.textLineFinalY.setText(str(pos[1] - self.image_label.y()))
-        
-        self.image_label.setPixmap(pixmap)
-        self.update()
-            
-    def getLineProp(self, posx, posy):
-        posn1 = QPoint(posx, posy) #global value since this is gained from mouse - this is last point dragged to
-        slope = ((posn1.y() - self.image_label.y()) - self.starty) / ((posn1.x() - self.image_label.x()) - self.startx)
-        interceptY = self.starty - (slope * self.startx)
-        rightMostY = slope * (self.image_label.width() - self.image_label.x()) + interceptY
-        if slope == 0:
-            return interceptY, rightMostY, self.image_label.x(), slope
+        if (self.startx is None or self.starty is None or self.lastx is None or self.lasty is None):
+            return
+        posExt = self.extendLine(pos)
+        if self._plot_ref[1] is None:
+            plot_refs = self.ax.plot(posExt[0], posExt[1], '-', color='yellow')
+            self._plot_ref[1] = plot_refs[0]
         else:
-            intersectX = -interceptY / slope #from the top left corner
-            return interceptY, rightMostY, intersectX, slope
+            # We have a reference, we can use it to update the data for that line.
+            self._plot_ref[1].set_xdata(posExt[0])
+            self._plot_ref[1].set_ydata(posExt[1])
+        #print(f"x_ext: {posExt[0]}, y_ext: {posExt[1]}")
+        
+        self.textLineFinalX.setText(str(pos[0]))
+        self.textLineFinalY.setText(str(pos[1]))
+        
+        self.canvas.draw()
+    
+    def extendLine(self, pos):
+        xlim = self.ax.get_xlim()
+        ylim = self.ax.get_ylim()
+
+        distance = np.sqrt((pos[0] - self.startx)**2 + (pos[1] - self.starty)**2)
+
+        x_ext = np.linspace(xlim[0], xlim[1], int(distance))
+        p = np.polyfit([self.startx, pos[0]], [self.starty, pos[1]], deg=1)
+        y_ext = np.poly1d(p)(x_ext)
+        '''
+        if any(y_ext) > ylim[1]:
+            y_ext = np.linspace(ylim[0], ylim[1], int(distance))
+            p = np.polyfit([self.startx, pos[0]], [self.starty, pos[1]], deg=1)
+            x_ext = np.poly1d(p)(y_ext)
+            '''
+        
+        
+        self.ax.set_xlim(xlim)
+        self.ax.set_ylim(ylim)
+        return (x_ext, y_ext)
         
     #interpolate the line to go across the image
     def interpl(self): 
-        interceptY, rightMostY, intersectX, slope = self.getLineProp(int(self.textLineFinalX.text()), int(self.textLineFinalY.text()))
-        if (self.textLineX.text() == "" or self.textLineY.text() == "" or self.textLineFinalX.text() == "" or self.textLineFinalY.text() == ""):
+        posExt = self.extendLine((self.lastx, self.lasty))
+        print(posExt)
+        if (posExt[0] is None or posExt[1] is None):
             return #make sure there is a line to interpolate
-        height = self.image_label.height() - 1
-        width = self.image_label.width() - 1
-        rightmostY = max(min(rightMostY, height), 0)
-        leftmostY = max(min(interceptY, height), 0)
-        if slope == 0:
-            leftmostX = 0
-            rightmostX = width
-        else:
-            leftmostX = max(min((leftmostY-interceptY) / slope, width), 0)
-            rightmostX = max(min((rightmostY-interceptY) / slope, width), 0)       
-        posn1 = QPoint(int(leftmostX), int(leftmostY))
-        posn2 = QPoint(int(rightmostX), int(rightmostY))
-        #where posn1 is the starting point and posn2 is the ending point
-        length = np.sqrt((posn2.x() - posn1.x())**2 + (posn2.y() - posn1.y())**2)
-        xlen = int(length)
-        ylen = len(self.tifArr)
-        x_new = np.linspace(posn1.x(), posn2.x(), xlen)
-        y_new = np.linspace(posn1.y(), posn2.y(), xlen)
         
         #maybe add some checks here to dumbproof
         
         #only return those points in the array which align with x_new and y_new
-        result = np.zeros(shape = (ylen, xlen)) #this will eventually be converted to image so should be height by width
+        result = np.zeros(shape = (len(posExt[0]), len(posExt[1]))) #this will eventually be converted to image so should be height by width
         imIndex = 0
         for tiffIm in self.tifArr:
             for x in range(result.shape[1]):
-                result[imIndex][x] = int(tiffIm[int(x_new[x])][int(y_new[x])])
+                result[imIndex][x] = int(tiffIm[int(posExt[0][x])][int(posExt[1][x])])
             imIndex += 1
         result = result.astype(float)
         
@@ -304,9 +314,6 @@ class ARPESGUI(QMainWindow):
         return
     
     def showNewImage(self, result):
-        #print("result")
-        #print(result)
-        #print(type(self.info))
         self.w = EnergyVMomentum(result, self.dir_path, self.tifArr, self.dat)
         #w.result = result
         self.w.show()
