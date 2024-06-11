@@ -2,7 +2,7 @@
 #recipricsl dpsce #jahn-teller effect
 from PyQt6.QtWidgets import QMainWindow, QLabel, QHBoxLayout, QVBoxLayout, QWidget, QSlider
 from PyQt6.QtWidgets import QFileDialog, QGraphicsView 
-from PyQt6.QtWidgets import QLineEdit, QPushButton
+from PyQt6.QtWidgets import QLineEdit, QPushButton, QComboBox
 from PyQt6.QtGui import QPixmap, QPainter, QPen, QColor, QIntValidator
 from PyQt6.QtCore import Qt, QDir, QPoint
 from tifConv import tiffIm, getInfo
@@ -13,6 +13,7 @@ import os, sys
 from commonWidgets import resetButtonCom, setupFigureCom, configureGraphCom
 import buildImage
 import fileWork
+import matplotlib.pyplot as plt
 from tifConv import getEnergies
 
 class ARPESGUI(QMainWindow):
@@ -57,7 +58,7 @@ class ARPESGUI(QMainWindow):
         self.layoutCol2Col1.addLayout(self.layoutCol2Row3)
         self.layoutCol2Col1.addLayout(self.layoutCol2Row4)
         self.layoutCol2Col1.addLayout(self.layoutCol2Row5)
-        self.layoutCol2.addLayout(self.layoutCol2Row6)
+        self.layoutCol2Col1.addLayout(self.layoutCol2Row6)
         self.layoutCol2.addLayout(self.layoutCol2Col1)
         layoutRow1.addLayout(self.layoutCol2)
         self.central_widget.setLayout(layoutRow1)
@@ -75,12 +76,14 @@ class ARPESGUI(QMainWindow):
         
         #print(self.tifArr)
         
+        #Main figure
         setupFigureCom(self)
         self.imageBuilder = buildImage.ImageBuilder()
         self.imageBuilder.buildImage(self, 0)
         self.ax.axis('off')  # Turn off axes
         self.ax.autoscale(False)
         self.layoutCol1.addWidget(self.canvas)
+        #print(plt.colormaps())
         
         #add slider to slide through images
         slider = QSlider(Qt.Orientation.Horizontal) #create new horizontal slider
@@ -169,6 +172,12 @@ class ARPESGUI(QMainWindow):
         self.canvas.mpl_connect('button_press_event', self.plotMouseClick)
         self.canvas.mpl_connect('motion_notify_event', self.plotMouseMove)
         self.canvas.mpl_connect('button_release_event', self.plotMouseRelease)
+        
+        #create colormap
+        self.colormap = QComboBox()
+        self.colormap.addItems(plt.colormaps())
+        self.layoutCol2Row5.addWidget(self.colormap)
+        self.colormap.currentTextChanged.connect(self.changeColormap)
     
     #resets the line
     def resetLine(self):
@@ -176,10 +185,21 @@ class ARPESGUI(QMainWindow):
         self.textLineY.setText("")
         self.textLineFinalX.setText("")
         self.textLineFinalY.setText("")
-        self.image_label.setPixmap(QPixmap.fromImage(ImageQt.ImageQt(self.im)))
+        #self.image_label.setPixmap(QPixmap.fromImage(ImageQt.ImageQt(self.im)))
         self.resetButton.setStyleSheet("color : rgba(0, 0, 0, 0); background-color : rgba(0, 0, 0, 0); border : 0px solid rgba(0, 0, 0, 0);")
-        #self.resetButton.hide()
-        self.update()
+        self.resetButton.hide()
+        
+        self.ax.cla()
+        self._plot_ref[1] = None
+        self.imageBuilder.buildImage(self, self.lastIm)
+        self.ax.axis('off')  # Turn off axes
+        #self._plot_ref[1] = None
+        #self.canvas.draw()
+        #self.update()
+        
+    def changeColormap(self, text):
+        self._plot_ref[0].set_cmap(text)
+        self.canvas.draw()
         
     #get infohead
     def getInfo(self):
@@ -223,12 +243,14 @@ class ARPESGUI(QMainWindow):
     
     #start point on click
     def plotMouseClick(self, e):
-        #self.resetButton.show()
-        #self.resetButton.setStyleSheet("")
+        self.resetButton.show()
+        self.resetButton.setStyleSheet("")
         self.tracking = not self.tracking
         if e.inaxes:
             self.startx = e.xdata
             self.starty = e.ydata
+            self.textLineX.setText(str(self.startx))
+            self.textLineY.setText(str(self.starty))
         #print(f"startx: {self.startx}, starty: {self.starty}")
          
     def plotMouseMove(self, e):
@@ -246,17 +268,22 @@ class ARPESGUI(QMainWindow):
         
     #on text change, update the line
     def text_edited(self, s):
-        if (self.lastx is not None and self.lasty is not None):
+        if (self.lastx is not None and self.lasty is not None and self.startx is not None and self.starty is not None):
             #self.image_label.setPixmap(QPixmap.fromImage(ImageQt.ImageQt(self.im)))
-            self.lastx = int(self.textLineFinalX.text())
-            self.lasty = int(self.textLineFinalY.text())
+            self.lastx = float(self.textLineFinalX.text())
+            self.lasty = float(self.textLineFinalY.text())
+            self.startx = float(self.textLineX.text())
+            self.starty = float(self.textLineY.text())
             self.makeLine((self.lastx, self.lasty))
     
     #draws the line  
     def makeLine(self, pos):
         if (self.startx is None or self.starty is None or self.lastx is None or self.lasty is None):
             return
-        posExt = self.extendLine(pos)
+        
+        posExt, distance = self.extendLine(pos)
+        #posExt starts from top left to whereever the line ends
+        
         if self._plot_ref[1] is None:
             plot_refs = self.ax.plot(posExt[0], posExt[1], '-', color='yellow')
             self._plot_ref[1] = plot_refs[0]
@@ -273,42 +300,115 @@ class ARPESGUI(QMainWindow):
     
     def extendLine(self, pos):
         xlim = self.ax.get_xlim()
-        ylim = self.ax.get_ylim()
+        ylim = self.ax.get_ylim() #this is max height then the minimum
+        #self.ax.set_xlim(xlim)
+        #self.ax.set_ylim(ylim)
+        #print(f"xlim: {xlim}, ylim: {ylim}")
 
         distance = np.sqrt((pos[0] - self.startx)**2 + (pos[1] - self.starty)**2)
-
-        x_ext = np.linspace(xlim[0], xlim[1], int(distance))
-        p = np.polyfit([self.startx, pos[0]], [self.starty, pos[1]], deg=1)
-        y_ext = np.poly1d(p)(x_ext)
+        
+        #print(f"self.startx: {self.startx}, self.starty: {self.starty}")
+        #print(f"pos[0]: {pos[0]}, pos[1]: {pos[1]}")
+        if self.startx == pos[0]: #verticle line
+            x_ext = np.full(int(ylim[0] - ylim[1]), self.startx)
+            y_ext = np.linspace(ylim[1], ylim[0], int(ylim[0] - ylim[1]))
+            #print(f"verticle, x_ext: {x_ext}, y_ext: {y_ext}")
+            return (x_ext, y_ext), distance 
+        
+        fx = np.polyfit([self.startx, pos[0]], [self.starty, pos[1]], deg=1)
+        fy = np.polyfit([self.starty, pos[1]], [self.startx, pos[0]], deg=1)
+        #print(fx)
+        
+        #here start means where xintercept is, and final means where the line would intersect with the upperbound of the box (i.e. the right side for x)
+        xfinal = np.poly1d(fy)(xlim[1])
+        yfinal = np.poly1d(fx)(ylim[0])
+        xstart = np.poly1d(fy)(xlim[0])
+        ystart = np.poly1d(fx)(ylim[1])
+        #print(f"\nxfinal: {xfinal}, yfinal: {yfinal}")
+        #print(f"xstart: {xstart}, ystart: {ystart}\n")
+        
+        xstart = np.clip(xstart, xlim[0], xlim[1]) #make sure it doesn't go out of bounds
+        ystart = np.clip(ystart, ylim[1], ylim[0])
+        xfinal = np.clip(xfinal, xlim[0], xlim[1])
+        yfinal = np.clip(yfinal, ylim[1], ylim[0])
+        #print(f"new xstart: {xstart}, ystart: {ystart}")
+        #print(f"new xfinal: {xfinal}, yfinal: {yfinal}")
+        
+        #x_ext = np.linspace(xlim[0], xlim[1], int(distance))
+        #y_ext = np.poly1d(fx)(x_ext)
+        
+        if (min(xstart, xfinal) == xlim[0] and max(xstart, xfinal) == xlim[1]):
+            #horizontal
+            distance = np.sqrt((xlim[0] - xlim[1])**2 + (ystart - yfinal)**2)
+            x_ext = np.linspace(xstart, xfinal, int(distance))
+            y_ext = np.poly1d(fx)(x_ext)
+        elif (min(ystart, yfinal) == ylim[1] and max(ystart, yfinal) == ylim[0]):
+            #verticle
+            distance = np.sqrt((xstart - xfinal)**2 + (ylim[1] - ylim[0])**2)
+            y_ext = np.linspace(ystart, yfinal, int(distance))
+            x_ext = np.poly1d(fy)(y_ext)
+    
+        elif (min(xstart, xfinal) == xlim[0] and min(ystart, yfinal) == ylim[1]):
+            #left to top
+            distance = np.sqrt((xlim[0] - max(xstart, xfinal))**2 + (max(ystart, yfinal) - ylim[1])**2)
+            x_ext = np.linspace(xlim[0], max(xstart, xfinal), int(distance))
+            y_ext = np.poly1d(fx)(x_ext)
+        elif (max(xstart, xfinal) == xlim[1] and max(ystart, yfinal) == ylim[0]):
+            #right to bottom
+            distance = np.sqrt((xlim[1] - min(xstart, xfinal))**2 + (ylim[0] - min(ystart, yfinal))**2)
+            x_ext = np.linspace(min(xstart, xfinal), xlim[1], int(distance))
+            y_ext = np.poly1d(fx)(x_ext)
+        elif (min(xstart, xfinal) == xlim[0] and max(ystart, yfinal) == ylim[0]):
+            #left to bottom
+            distance = np.sqrt((xlim[0] - max(xstart, xfinal))**2 + (min(ystart, yfinal) - ylim[0])**2)
+            x_ext = np.linspace(xlim[0], max(xstart, xfinal), int(distance))
+            y_ext = np.poly1d(fx)(x_ext)
+        elif (max(xstart, xfinal) == xlim[1] and min(ystart, yfinal) == ylim[1]):
+            #right to top
+            #print("right to top")
+            distance = np.sqrt((xlim[1] - min(xstart, xfinal))**2 + (ylim[1] - max(ystart, yfinal))**2)
+            x_ext = np.linspace(max(xstart, xfinal), xlim[0], int(distance))
+            y_ext = np.poly1d(fx)(x_ext)
+        else:
+            #print("\n\nelse\n\n")
+            #throw exception?
+            #pure horizontal
+            distance = xlim[1] - xlim[0]
+            x_ext = np.linspace(xlim[0], xlim[1], int(distance))
+            y_ext = np.linspace(ystart, ystart, int(distance))
+        
         '''
-        if any(y_ext) > ylim[1]:
-            y_ext = np.linspace(ylim[0], ylim[1], int(distance))
-            p = np.polyfit([self.startx, pos[0]], [self.starty, pos[1]], deg=1)
-            x_ext = np.poly1d(p)(y_ext)
-            '''
+        distance = np.sqrt((xfinal - xstart)**2 + (yfinal - ystart)**2)
+        x_ext = np.linspace(min(xstart, xfinal), max(xstart, xfinal), int(distance))
+        y_ext = np.linspace(min(ystart, yfinal), max(ystart, yfinal), int(distance))
+        '''
         
+        #print(f"x_ext: {x_ext}, y_ext: {y_ext}")
+        #print(x_ext)
+        #print(y_ext)
         
-        self.ax.set_xlim(xlim)
-        self.ax.set_ylim(ylim)
-        return (x_ext, y_ext)
+        return (x_ext, y_ext), distance
         
     #interpolate the line to go across the image
     def interpl(self): 
-        posExt = self.extendLine((self.lastx, self.lasty))
-        print(posExt)
+        posExt, distance = self.extendLine((self.lastx, self.lasty))
+        #print(f"posExt: {posExt}")
         if (posExt[0] is None or posExt[1] is None):
             return #make sure there is a line to interpolate
         
         #maybe add some checks here to dumbproof
         
         #only return those points in the array which align with x_new and y_new
-        result = np.zeros(shape = (len(posExt[0]), len(posExt[1]))) #this will eventually be converted to image so should be height by width
+        #result = np.zeros(shape = (len(posExt[0]), len(posExt[1]))) #this will eventually be converted to image so should be height by width (height is number of images, width is distance of selection)
+        result = np.zeros(shape = (int(len(self.tifArr)), int(distance)))
         imIndex = 0
         for tiffIm in self.tifArr:
-            for x in range(result.shape[1]):
-                result[imIndex][x] = int(tiffIm[int(posExt[0][x])][int(posExt[1][x])])
+            for i in range(result.shape[1]):
+                result[imIndex][i] = int(tiffIm[int(posExt[0][i])][int(posExt[1][i])])
             imIndex += 1
         result = result.astype(float)
+        
+        result = np.flip(result, axis=0)
         
         self.showNewImage(result)
         return
