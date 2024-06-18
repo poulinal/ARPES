@@ -3,8 +3,8 @@ from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
 from PyQt6.QtWidgets import QGraphicsView, QPushButton
 import numpy as np
 
-from commonWidgets import saveButtonCom, saveFileCom, errorDialogueCom
-from commonWidgets import configureGraphCom, setupFigureCom, remap, rescale
+from commonWidgets import save_button_com, save_file_com, error_dialogue_com
+from commonWidgets import configure_graph_com, setup_figure_com, remap, rescale
 
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
@@ -46,42 +46,42 @@ class DistCrve(QWidget):
         self.layoutCol1 = QVBoxLayout()
         self.layoutCol2 = QVBoxLayout()
         #set up the UI
-        self.setupUI()
+        self.setup_UI()
         #finalize layout
         self.layoutCol2.addWidget(self.canvas)
         self.layoutRow1.addLayout(self.layoutCol1)
         self.layoutRow1.addLayout(self.layoutCol2)
         self.setLayout(self.layoutRow1)
         
-    def setupUI(self):
+    def setup_UI(self):
         #setup the save button
-        saveButtonCom(self, "Save File")
-        self.layoutCol1.addWidget(self.saveButton)
+        save_button_com(self, "Save File")
+        self.layoutCol1.addWidget(self.save_button)
         
         #setupFigure
-        setupFigureCom(self)
+        setup_figure_com(self)
         
         #build
         self.show()
-        self.buildDC()
-        self.configureGraph()
+        self.build_DC()
+        self.configure_graph()
         
     #builds the distribution curve
-    def buildDC(self):
+    def build_DC(self):
         self.ax = self.figure.add_subplot(111) #add subplot
         self.ax.clear() #clear any old ones
-        self.newResult = self.configureType() #get data
+        self.newResult = self.configure_type() #get data
         #self.newResult = rescale(self.newResult, self.posStart[1], self.posEnd[1]) #rescale
         #y = rescale(self.newResult[0], self.posStart[1], self.posEnd[1])
         self.ax.plot(self.newResult[0], '-') #plot
         self.canvas.draw() #redraw
         
     #configures the graph 
-    def configureGraph(self):
-        configureGraphCom(self, self.type, 'Intensity', '')
+    def configure_graph(self):
+        configure_graph_com(self, self.type, 'Intensity', '')
     
     #configures the type of distribution curve    
-    def configureType(self):
+    def configure_type(self):
         #get the points based on box selection
         if self.datPosStart[0] is None or self.datPosStart[1] is None or self.datPosEnd[0] is None or self.datPosEnd[1] is None: #get full image
             selectedBox = self.result
@@ -105,12 +105,12 @@ class DistCrve(QWidget):
         return newResult
     
     #saves the file
-    def saveFile(self):
-        saveFileCom(self, self.newResult)
+    def save_file(self):
+        save_file_com(self, self.newResult)
         
     #throws an error dialogue   
-    def errorDialogue(self, title, message):
-        errorDialogueCom(self, title, message)
+    def error_dialogue(self, title, message):
+        error_dialogue_com(self, title, message)
         return False
         
          

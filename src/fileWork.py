@@ -1,5 +1,5 @@
 import os, sys
-from commonWidgets import getFolder
+from commonWidgets import get_folder
 
 class files():
     def __init__(self):

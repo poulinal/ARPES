@@ -3,9 +3,9 @@ from PyQt6.QtWidgets import QLabel, QHBoxLayout, QVBoxLayout, QWidget
 from PyQt6.QtWidgets import QGraphicsView, QPushButton
 import numpy as np
 
-from distributionCurve import DistCrve
-from tifConv import getEnergies
-from commonWidgets import saveButtonCom, saveFileCom, errorDialogueCom, configureGraphCom, setupFigureCom, resetButtonCom
+from ARPES.src.distCurve.distributionCurve import DistCrve
+from tifConv import get_energies
+from commonWidgets import save_button_com, save_file_com, error_dialogue_com, configure_graph_com, setup_figure_com, reset_button_com
 
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -44,17 +44,17 @@ class EnergyVMomentum(QWidget):
         self.layoutRow1 = QHBoxLayout()
         self.layoutCol1 = QVBoxLayout()
         self.layoutCol2 = QVBoxLayout()
-        #setupUI
-        self.setupUI()
+        #setup_UI
+        self.setup_UI()
         #finialize layout
         self.layoutCol2.addWidget(self.canvas)
         self.layoutRow1.addLayout(self.layoutCol1)
         self.layoutRow1.addLayout(self.layoutCol2)
         self.setLayout(self.layoutRow1)
         
-    def setupUI(self):
-        saveButtonCom(self, "Save File")
-        self.layoutCol1.addWidget(self.saveButton)
+    def setup_UI(self):
+        save_button_com(self, "Save File")
+        self.layoutCol1.addWidget(self.save_button)
         
         self.intXButton = QPushButton("Int over X")
         self.intXButton.setFixedSize(100, 50)  # Set the fixed size of the button to create a square shape
@@ -65,38 +65,38 @@ class EnergyVMomentum(QWidget):
         
         self.intXButton.clicked.connect(self.integrate)
         self.intYButton.clicked.connect(self.integrate)
-        self.saveButton.clicked.connect(self.saveFile)
+        self.save_button.clicked.connect(self.save_file)
         
         #setupFigure
-        setupFigureCom(self)
+        setup_figure_com(self)
         
         # Connect the mouse events
-        self.canvas.mpl_connect('button_press_event', self.plotMouseClick)
-        self.canvas.mpl_connect('motion_notify_event', self.plotMouseMove)
-        self.canvas.mpl_connect('button_release_event', self.plotMouseRelease)
+        self.canvas.mpl_connect('button_press_event', self.plot_mouse_click)
+        self.canvas.mpl_connect('motion_notify_event', self.plot_mouse_move)
+        self.canvas.mpl_connect('button_release_event', self.plot_mouse_release)
         
         self.show()
         #self.ax = self.figure.add_subplot(111)
-        self.buildEM()
+        self.build_EM()
         
         #setup reset button
-        resetButtonCom(self)
+        reset_button_com(self)
         self.layoutCol1.addWidget(self.resetButton)
     
     #resets the line
-    def resetLine(self):
+    def reset_line(self):
         #self.figure = Figure()
         #self.canvas = FigureCanvas(self.figure)
         #self.figure.clf()
         self.ax.cla()
         self._plot_ref[0] = None
-        self.buildEM()
+        self.build_EM()
         self.resetButton.setStyleSheet("color : rgba(0, 0, 0, 0); background-color : rgba(0, 0, 0, 0); border : 0px solid rgba(0, 0, 0, 0);")
         #self.resetButton.hide()
         #self.update()
         
     #start point on click
-    def plotMouseClick(self, e):
+    def plot_mouse_click(self, e):
         #self.resetButton.show()
         self.resetButton.setStyleSheet("")
         self.tracking = not self.tracking
@@ -110,7 +110,7 @@ class EnergyVMomentum(QWidget):
             
             
     #allow drag
-    def plotMouseMove(self, e):
+    def plot_mouse_move(self, e):
         #note the xdata gets the position in the graph --good for matplotlib
         #note the x gets the position in pixels from left and bottom of axes --good for pyqt
         if e.inaxes and self.tracking:
@@ -119,17 +119,17 @@ class EnergyVMomentum(QWidget):
             self.lasty = e.ydata
             self.dataLastx = e.x
             self.dataLasty = e.y
-            self.createArea(pos)
+            self.create_area(pos)
     
     #release stop tracking
-    def plotMouseRelease(self, e):
+    def plot_mouse_release(self, e):
         self.tracking = False
         
     #build EM plot
-    def buildEM(self):
+    def build_EM(self):
         #self.ax.clear() # discards the old graph
         #get data
-        energies = getEnergies(self.path, self.dat)
+        energies = get_energies(self.path, self.dat)
         #set range and plot
         self.energiesLow = energies[0]
         self.energiesHigh = energies[len(energies)-1]
@@ -138,11 +138,11 @@ class EnergyVMomentum(QWidget):
         #remap to the energies of the experiment
         self.ax.set_aspect(self.result.shape[1] / (energies[len(energies)-1] - energies[0]))
         # refresh canvas
-        self.configureGraph()
+        self.configure_graph()
         self.canvas.draw()
     
     #create the boxed area
-    def createArea(self, pos):
+    def create_area(self, pos):
         x0 = self.startx
         y0 = self.starty
         xf = pos[0]
@@ -194,8 +194,8 @@ class EnergyVMomentum(QWidget):
         self.canvas.draw()
     
     #configure the graph
-    def configureGraph(self):
-        configureGraphCom(self, 'Energy vs Momentum', 'Momentum', 'Energy')
+    def configure_graph(self):
+        configure_graph_com(self, 'Energy vs Momentum', 'Momentum', 'Energy')
         
     #integrate over x or y
     def integrate(self):
@@ -219,12 +219,12 @@ class EnergyVMomentum(QWidget):
         self.w.show()
          
     #save the file
-    def saveFile(self):
-        saveFileCom(self, self.result)
+    def save_file(self):
+        save_file_com(self, self.result)
     
     #throws error dialogue 
-    def errorDialogue(self, title, message):
-        errorDialogueCom(self, title, message)
+    def error_dialogue(self, title, message):
+        error_dialogue_com(self, title, message)
         return False
          
         

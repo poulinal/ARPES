@@ -1,15 +1,13 @@
 from PyQt6.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QFileDialog
 
-from commonWidgets import errorDialogueCom, saveButtonCom
+from commonWidgets import error_dialogue_com, save_button_com, configure_graph_com
 import fileWork
-from tifConv import tiffIm, getEnergies
+from tifConv import tiff_im, get_energies
 import numpy as np
 import pandas as pd
 
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-
-import csv
 
 
 """_summary_
@@ -35,8 +33,8 @@ class XPSGUI(QMainWindow):
         self.dat = files.dat
         #self.energies = files.energies
         tif = files.tif
-        self.tifArr = tiffIm(self.dir_path, tif)
-        self.energyArr = getEnergies(self.dir_path, self.dat)
+        self.tifArr = tiff_im(self.dir_path, tif)
+        self.energyArr = get_energies(self.dir_path, self.dat)
         
         #setupFigureCom(self)
         # a figure instance to plot on
@@ -57,9 +55,11 @@ class XPSGUI(QMainWindow):
         print(self.result)
         #print(self.energyArr)
         self.ax.plot(self.result, '-')
+        self.configure_graph()
+
         
-        saveButtonCom(self, "Save File")
-        layoutRow.addWidget(self.saveButton)
+        save_button_com(self, "Save File")
+        layoutRow.addWidget(self.save_button)
         #self.saveButton.clicked.connect(self.saveFile)
         
         layout.addLayout(layoutRow)
@@ -74,26 +74,15 @@ class XPSGUI(QMainWindow):
             result[0][i] = np.sum(self.tifArr[i])
         return result
     
+    #configure the graph
+    def configure_graph(self):
+        self.ax.set_title("Intensity vs Energy")
+        self.ax.set_xlabel("Energy")
+        self.ax.set_ylabel("Intensity")
+        
+    
     #save the file
-    def saveFile(self):
-        '''
-        with open('studentsq.csv', 'w', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerows(self.result)
-            
-        file_name, _ = QFileDialog.getSaveFileName(self,"Save File","","Text Files(*.txt)")#,options = options)
-        if file_name:
-            f = open(file_name, 'w')
-            np.set_printoptions(threshold=np.inf)
-            f.write(np.array_str(text))
-            self.setWindowTitle(str(os.path.basename(file_name)) + " - ARPES Analysis")
-            f.close()
-            np.set_printoptions()#revert to defautl
-            return True
-        else:
-            return self.errorDialogue("Error", "File not saved")
-        #saveFileCom(self, self.result)
-        '''
+    def save_file(self):
         #print(np.flip(self.result))
         df = pd.DataFrame(np.flip(self.result), columns =['Energy', 'Intensity']) 
         
@@ -101,19 +90,11 @@ class XPSGUI(QMainWindow):
         if file_name:
             print(file_name)
             df.to_excel(file_name, index = False)
-            '''
-            f = open(file_name, 'w')
-            np.set_printoptions(threshold=np.inf)
-            f.write(np.array_str(text))
-            self.setWindowTitle(str(os.path.basename(file_name)) + " - ARPES Analysis")
-            f.close()
-            np.set_printoptions()#revert to defautl
-            '''
             return True
         else:
-            return self.errorDialogue("Error", "File not saved")
+            return self.error_dialogue("Error", "File not saved")
         
     #throws error dialogue 
-    def errorDialogue(self, title, message):
-        errorDialogueCom(self, title, message)
+    def error_dialogue(self, title, message):
+        error_dialogue_com(self, title, message)
         return False

@@ -20,9 +20,9 @@ class HOMEGUI(QMainWindow):
 
         # Create left button with image
         arpesButton = QPushButton()
-        arpesButton.setIcon(QIcon('/Users/alexpoulin/Downloads/git/ARPES/files/images/arpesDemo.png'))  # Set left picture
+        arpesButton.setIcon(QIcon('/Users/alexpoulin/Downloads/git/ARPES/src/images/arpesDemo.png'))  # Set left picture
         #print(arpesButton.sizeHint())
-        arpesButton.clicked.connect(self.arpesButtonClicked)  # Connect click signal
+        arpesButton.clicked.connect(self.arpes_button_clicked)  # Connect click signal
         #arpesButton.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
         #arpesButton.setFixedSize(500,500)
         layout.addWidget(arpesButton, 0, 0, 3, 1)
@@ -32,35 +32,20 @@ class HOMEGUI(QMainWindow):
 
         # Create right button with image
         xpsButton = QPushButton()
-        xpsButton.setIcon(QIcon('/Users/alexpoulin/Downloads/git/ARPES/files/images/xpsDemo.png'))  # Set right picture
-        xpsButton.clicked.connect(self.xpsButtonClicked)  # Connect click signal
+        xpsButton.setIcon(QIcon('/Users/alexpoulin/Downloads/git/ARPES/src/images/xpsDemo.png'))  # Set right picture
+        xpsButton.clicked.connect(self.xps_button_clicked)  # Connect click signal
         layout.addWidget(xpsButton, 0, 1, 3, 1)
         xpsButton.setIconSize(xpsButton.size())  # Set icon size to button size
 
         
         self.central_widget.setLayout(layout)
 
-    def arpesButtonClicked(self):
+    def arpes_button_clicked(self):
         print("Left button clicked")
         self.w = ARPESGUI()
         self.w.show()
 
-    def xpsButtonClicked(self):
+    def xps_button_clicked(self):
         print("Right button clicked")
         self.w = XPSGUI()
         self.w.show()
-        
-        '''
-class ArpesButton(QWidget):
-    def __init__(self, *args):
-        super().__init__(*args)
-        
-        # Create left button with image
-        arpesButton = QPushButton()
-        arpesButton.setIcon(QIcon('/Users/alexpoulin/Downloads/git/ARPES/files/images/arpesDemo.png'))  # Set left picture
-        #print(arpesButton.sizeHint())
-        arpesButton.clicked.connect(self.arpesButtonClicked)  # Connect click signal
-        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
-        arpesButton.setIconSize(QSize(arpesButton.sizeHint()))  # Set icon size to button size
-        #print(self.central_widget.sizeHint().width, self.central_widget.sizeHint().height)
-        '''

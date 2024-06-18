@@ -5,7 +5,7 @@ from PIL import Image
 from pandas import read_csv as pd
 
 # Converts all Tiff files in the form of an array
-def tiffIm(path, tif):
+def tiff_im(path, tif):
     tifIm = []
     for tiffName in tif: 
         tiffFile = Image.open(path + "/" + tiffName) #open the tiff file
@@ -14,7 +14,7 @@ def tiffIm(path, tif):
     return tifIm
 
 # Gets the energies from the tiff files
-def getEnergies(path, dat): 
+def get_energies(path, dat): 
     df = pd(path + "/" + dat, header=None, names=['col'])
     energies = []
     num = ""
@@ -38,7 +38,7 @@ def getEnergies(path, dat):
     return energies
 
 #returns info from the dat file, FILE_ID, EXPERIMENT_NAME, MEASUREMENT_NAME, TIMESTAMP, INSTITUTION, SAMPLE
-def getInfo(path, dat):
+def get_info(path, dat):
     df = pd(path + "/" + dat, header=None, names=['col'])
     info = df.head(9)
     print(info)

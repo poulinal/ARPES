@@ -1,6 +1,6 @@
 class ImageBuilder():
     #build EM plot
-    def buildImage(self, other, im):
+    def build_image(self, other, im):
         #self.ax.clear() # discards the old graph
         if (other._plot_ref[0] is None):
             #print("new")

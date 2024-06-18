@@ -24,12 +24,12 @@ def rescale(original_array, new_min, new_max):
     print(resized_array)
     return resized_array
 
-def saveButtonCom(self, text):
-    self.saveButton = QPushButton(text)
-    self.saveButton.setFixedSize(100, 50)  # Set the fixed size of the button to create a square shape
-    self.saveButton.clicked.connect(self.saveFile)
+def save_button_com(self, text):
+    self.save_button = QPushButton(text)
+    self.save_button.setFixedSize(100, 50)  # Set the fixed size of the button to create a square shape
+    self.save_button.clicked.connect(self.save_file)
 
-def saveFileCom(self, text):
+def save_file_com(self, text):
     #options = QFileDialog.options()
     #options |= QFileDialog.DontUseNativeDialog
     file_name, _ = QFileDialog.getSaveFileName(self,"Save File","","Text Files(*.txt)")#,options = options)
@@ -39,12 +39,12 @@ def saveFileCom(self, text):
         f.write(np.array_str(text))
         self.setWindowTitle(str(os.path.basename(file_name)) + " - ARPES Analysis")
         f.close()
-        np.set_printoptions()#revert to defautl
+        np.set_printoptions()#revert todefautl
         return True
     else:
-        return self.errorDialogue("Error", "File not saved")
+        return self.error_dialogue("Error", "File not saved")
         
-def errorDialogueCom(self, title, message):
+def error_dialogue_com(self, title, message):
         msg = QMessageBox()
         msg.setIcon(QMessageBox.Icon.Critical)
         msg.setText(message)
@@ -52,7 +52,7 @@ def errorDialogueCom(self, title, message):
         msg.exec()
         return False
 
-def configureGraphCom(self, type, x, y):
+def configure_graph_com(self, type, x, y):
     self.ax.set_title(type)
     if type == "EDC" :
         y = "Energy"
@@ -79,7 +79,7 @@ def configureGraphCom(self, type, x, y):
     self.ax.grid(True)
     #self.ax.invert_yaxis()
     
-def setupFigureCom(self):
+def setup_figure_com(self):
     # a figure instance to plot on
     self.figure = Figure()
     # this is the Canvas Widget that displays the `figure`
@@ -98,16 +98,16 @@ def setupFigureCom(self):
     self.canvas.setStyleSheet("background-color:transparent;")
     self.ax = self.figure.add_subplot(111)
     
-def resetButtonCom(self):
+def reset_button_com(self):
     # Create a square button
     self.resetButton = QPushButton("Reset Line")
     self.resetButton.setFixedSize(100, 25)  # Set the fixed size of the button to create a square shape
-    self.resetButton.clicked.connect(self.resetLine)
+    self.resetButton.clicked.connect(self.reset_line)
     #self.resetButton.hide()
     self.resetButton.setStyleSheet("color : rgba(0, 0, 0, 0); background-color : rgba(0, 0, 0, 0); border : 0px solid rgba(0, 0, 0, 0);")
 
 #returns the path of the folder selected by the user
-def getFolder(self):
+def get_folder(self):
     #print("Get folder")
     dir_path = QFileDialog.getExistingDirectory(
         #parent=self,

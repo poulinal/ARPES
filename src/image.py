@@ -5,16 +5,16 @@ from PyQt6.QtWidgets import QFileDialog, QGraphicsView
 from PyQt6.QtWidgets import QLineEdit, QPushButton, QComboBox
 from PyQt6.QtGui import QPixmap, QPainter, QPen, QColor, QIntValidator
 from PyQt6.QtCore import Qt, QDir, QPoint
-from tifConv import tiffIm, getInfo
+from tifConv import tiff_im, get_info
 from energyVmomentum import EnergyVMomentum
 from PIL import Image, ImageQt
 import numpy as np
 import os, sys
-from commonWidgets import resetButtonCom, setupFigureCom, configureGraphCom
+from commonWidgets import reset_button_com, setup_figure_com, configure_graph_com
 import buildImage
 import fileWork
 import matplotlib.pyplot as plt
-from tifConv import getEnergies
+from tifConv import get_energies
 
 class ARPESGUI(QMainWindow):
     def __init__(self):
@@ -50,7 +50,7 @@ class ARPESGUI(QMainWindow):
         self.layoutCol2Row5 = QHBoxLayout()
         self.layoutCol2Row6 = QHBoxLayout()
         #setup the UI
-        self.setupUI()
+        self.setup_UI()
         #finalize layout
         layoutRow1.addLayout(self.layoutCol1)
         self.layoutCol2Col1.addLayout(self.layoutCol2Row1)
@@ -64,22 +64,22 @@ class ARPESGUI(QMainWindow):
         self.central_widget.setLayout(layoutRow1)
 
     #setup the basic ui elements
-    def setupUI(self):
+    def setup_UI(self):
         files = fileWork.files()
         self.dir_path = files.dir_path
         self.dat = files.dat
         #self.energies = files.energies
         tif = files.tif
-        self.tifArr = tiffIm(self.dir_path, tif)
+        self.tifArr = tiff_im(self.dir_path, tif)
         
-        self.energyArr = getEnergies(self.dir_path, self.dat)
+        self.energyArr = get_energies(self.dir_path, self.dat)
         
         #print(self.tifArr)
         
         #Main figure
-        setupFigureCom(self)
+        setup_figure_com(self)
         self.imageBuilder = buildImage.ImageBuilder()
-        self.imageBuilder.buildImage(self, 0)
+        self.imageBuilder.build_image(self, 0)
         self.ax.axis('off')  # Turn off axes
         self.ax.autoscale(False)
         self.layoutCol1.addWidget(self.canvas)
@@ -92,7 +92,7 @@ class ARPESGUI(QMainWindow):
         self.layoutCol1.addWidget(slider, stretch=1)  # Add the slider to the layout with stretch=1 to make it take full width
         
         #setup resetbutton
-        resetButtonCom(self)
+        reset_button_com(self)
         self.layoutCol2Row6.addWidget(self.resetButton)
         
         #setup submit button
@@ -102,7 +102,7 @@ class ARPESGUI(QMainWindow):
         self.layoutCol2Row5.addWidget(submitButton)
         
         #setup infoHead
-        self.info = QLabel(self.getInfo())
+        self.info = QLabel(self.get_info())
         self.info.setStyleSheet("border: 1px solid white;")
         #current energy level
         self.currentEnergy = QLabel(f"Current Energy Level: {self.energyArr[0]}")
@@ -169,18 +169,18 @@ class ARPESGUI(QMainWindow):
         self.slider_right.valueChanged.connect(self.update_label_right)
         
         # Connect the mouse events
-        self.canvas.mpl_connect('button_press_event', self.plotMouseClick)
-        self.canvas.mpl_connect('motion_notify_event', self.plotMouseMove)
-        self.canvas.mpl_connect('button_release_event', self.plotMouseRelease)
+        self.canvas.mpl_connect('button_press_event', self.plot_mouse_click)
+        self.canvas.mpl_connect('motion_notify_event', self.plot_mouse_move)
+        self.canvas.mpl_connect('button_release_event', self.plot_mouse_release)
         
         #create colormap
         self.colormap = QComboBox()
         self.colormap.addItems(plt.colormaps())
         self.layoutCol2Row5.addWidget(self.colormap)
-        self.colormap.currentTextChanged.connect(self.changeColormap)
+        self.colormap.currentTextChanged.connect(self.change_colormap)
     
     #resets the line
-    def resetLine(self):
+    def reset_line(self):
         self.textLineX.setText("")
         self.textLineY.setText("")
         self.textLineFinalX.setText("")
@@ -191,19 +191,19 @@ class ARPESGUI(QMainWindow):
         
         self.ax.cla()
         self._plot_ref[1] = None
-        self.imageBuilder.buildImage(self, self.lastIm)
+        self.imageBuilder.build_image(self, self.lastIm)
         self.ax.axis('off')  # Turn off axes
         #self._plot_ref[1] = None
         #self.canvas.draw()
         #self.update()
         
-    def changeColormap(self, text):
+    def change_colormap(self, text):
         self._plot_ref[0].set_cmap(text)
         self.canvas.draw()
         
     #get infohead
-    def getInfo(self):
-        infoHead = getInfo(self.dir_path, self.dat)
+    def get_info(self):
+        infoHead = get_info(self.dir_path, self.dat)
         #print(f"infoHead: \n {infoHead}, \n {type(infoHead)}")
         #FILE_ID, EXPERIMENT_NAME, MEASUREMENT_NAME, TIMESTAMP, INSTITUTION, SAMPLE
         #columnsToInclude = ['FILE_ID*', 'EXPERIMENT_NAME*', 'MEASUREMENT_NAME*', 'TIMESTAMP*', 'INSTITUTION*', 'SAMPLE*']
@@ -218,11 +218,11 @@ class ARPESGUI(QMainWindow):
     #(will updates the images) according to the slider value
     def slider_value_changed(self, i):
         self.lastIm = i
-        self.imageBuilder.buildImage(self, self.lastIm)
+        self.imageBuilder.build_image(self, self.lastIm)
         self.setupCurEnergy(i)
         '''
         if (self.lastx is not None and self.lasty is not None):
-            self.makeLine((self.lastx, self.lasty))
+            self.make_line((self.lastx, self.lasty))
             '''
             
     def update_label_left(self, value):
@@ -230,19 +230,19 @@ class ARPESGUI(QMainWindow):
         self.label_left.setText(f"Left: {self.vmin}")
         #self.slider_right.setMinimum(value)
         #self._plot_ref[0].set_clim(vmin=self.vmin)
-        self.imageBuilder.buildImage(self, self.lastIm)
+        self.imageBuilder.build_image(self, self.lastIm)
         #self.update()
     
     def update_label_right(self, value):
         self.vmax = value / 100
         self.label_right.setText(f"Right: {self.vmax}")
         #self._plot_ref[0].set_clim(vmax=self.vmax)
-        self.imageBuilder.buildImage(self, self.lastIm)
+        self.imageBuilder.build_image(self, self.lastIm)
         #self.slider_left.setMaximum(value - 1)
         #self.update()
     
     #start point on click
-    def plotMouseClick(self, e):
+    def plot_mouse_click(self, e):
         self.resetButton.show()
         self.resetButton.setStyleSheet("")
         self.tracking = not self.tracking
@@ -253,17 +253,17 @@ class ARPESGUI(QMainWindow):
             self.textLineY.setText(str(self.starty))
         #print(f"startx: {self.startx}, starty: {self.starty}")
          
-    def plotMouseMove(self, e):
+    def plot_mouse_move(self, e):
         if e.inaxes and self.tracking:
             #print("inaxes")
             pos = (e.xdata, e.ydata)
             self.lastx = e.xdata
             self.lasty = e.ydata
-            self.makeLine(pos)
+            self.make_line(pos)
             #print(f"lastx: {self.lastx}, lasty: {self.lasty}")
             
     #release stop tracking
-    def plotMouseRelease(self, e):
+    def plot_mouse_release(self, e):
         self.tracking = False
         
     #on text change, update the line
@@ -274,14 +274,14 @@ class ARPESGUI(QMainWindow):
             self.lasty = float(self.textLineFinalY.text())
             self.startx = float(self.textLineX.text())
             self.starty = float(self.textLineY.text())
-            self.makeLine((self.lastx, self.lasty))
+            self.make_line((self.lastx, self.lasty))
     
     #draws the line  
-    def makeLine(self, pos):
+    def make_line(self, pos):
         if (self.startx is None or self.starty is None or self.lastx is None or self.lasty is None):
             return
         
-        posExt, distance = self.extendLine(pos)
+        posExt, distance = self.extend_line(pos)
         #posExt starts from top left to whereever the line ends
         
         if self._plot_ref[1] is None:
@@ -298,7 +298,7 @@ class ARPESGUI(QMainWindow):
         
         self.canvas.draw()
     
-    def extendLine(self, pos):
+    def extend_line(self, pos):
         xlim = self.ax.get_xlim()
         ylim = self.ax.get_ylim() #this is max height then the minimum
         #self.ax.set_xlim(xlim)
@@ -391,7 +391,7 @@ class ARPESGUI(QMainWindow):
         
     #interpolate the line to go across the image
     def interpl(self): 
-        posExt, distance = self.extendLine((self.lastx, self.lasty))
+        posExt, distance = self.extend_line((self.lastx, self.lasty))
         #print(f"posExt: {posExt}")
         if (posExt[0] is None or posExt[1] is None):
             return #make sure there is a line to interpolate
@@ -410,10 +410,10 @@ class ARPESGUI(QMainWindow):
         
         result = np.flip(result, axis=0)
         
-        self.showNewImage(result)
+        self.show_new_image(result)
         return
     
-    def showNewImage(self, result):
+    def show_new_image(self, result):
         self.w = EnergyVMomentum(result, self.dir_path, self.tifArr, self.dat)
         #w.result = result
         self.w.show()
