@@ -2,8 +2,8 @@ from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QHBoxLayout, QVB
 from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtCore import QSize
 
-from image import ARPESGUI
-from xps import XPSGUI
+from src.image import ARPESGUI
+from src.xps import XPSGUI
 
 class HOMEGUI(QMainWindow):
     def __init__(self):

@@ -1,8 +1,8 @@
 from PyQt6.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QFileDialog
 
-from commonWidgets import error_dialogue_com, save_button_com, configure_graph_com
-import fileWork
-from tifConv import tiff_im, get_energies
+from src.commonWidgets import error_dialogue_com, save_button_com, configure_graph_com
+import src.fileWork
+from src.tifConv import tiff_im, get_energies
 import numpy as np
 import pandas as pd
 
@@ -28,7 +28,7 @@ class XPSGUI(QMainWindow):
         layout = QVBoxLayout(central_widget)
         layoutRow = QHBoxLayout()
         
-        files = fileWork.files()
+        files = src.fileWork.files()
         self.dir_path = files.dir_path
         self.dat = files.dat
         #self.energies = files.energies

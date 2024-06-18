@@ -3,9 +3,9 @@ from PyQt6.QtWidgets import QLabel, QHBoxLayout, QVBoxLayout, QWidget
 from PyQt6.QtWidgets import QGraphicsView, QPushButton
 import numpy as np
 
-from ARPES.src.distCurve.distributionCurve import DistCrve
-from tifConv import get_energies
-from commonWidgets import save_button_com, save_file_com, error_dialogue_com, configure_graph_com, setup_figure_com, reset_button_com
+from src.distributionCurve import DistCrve
+from src.tifConv import get_energies
+from src.commonWidgets import save_button_com, save_file_com, error_dialogue_com, configure_graph_com, setup_figure_com, reset_button_com
 
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas

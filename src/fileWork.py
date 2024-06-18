@@ -1,5 +1,5 @@
 import os, sys
-from commonWidgets import get_folder
+from src.commonWidgets import get_folder
 
 class files():
     def __init__(self):
@@ -15,7 +15,9 @@ class files():
         #self.dir_path = '/Users/alexpoulin/Downloads/git/ARPES/exData/Sum'
         #self.dir_path = '/Users/alexpoulin/Library/CloudStorage/OneDrive-NortheasternUniversity/DeLTA Lab/data/ARPES_MnTe_Direct_CA1750_FOV5p4_PE25_240529_193451/ARPES_MnTe_Direct_CA1750_FOV5p4_PE25_240529_193451/Sum'
         #self.dir_path = '/Users/alexpoulin/Downloads/git/ARPES/Data from EQUAL/Kinetic_energy_mapping_MnTe_Se capped_240514_102635/MnTe (Se capped)_PEEM_Direct_240514_102635/Sum'
-        self.dir_path = '/Users/alexpoulin/Downloads/git/ARPES/Data from EQUAL/XPS data/Sum' #XPS data
+        #self.dir_path = '/Users/alexpoulin/Downloads/git/ARPES/Data from EQUAL/XPS data/Sum' #XPS data
+        self.dir_path = '/Users/alexpoulin/Library/CloudStorage/OneDrive-NortheasternUniversity/DeLTA Lab/data/ARPES data 18th June24/ARPES_MnTe_Direct_Ekinsweep_240618_111423/ARPES_MnTe_Direct_FOV4p0_Iris_without large blisters_240618_111424/Sum'
+        #self.dir_path = '/Users/alexpoulin/Library/CloudStorage/OneDrive-NortheasternUniversity/DeLTA Lab/data/ARPES data 18th June24/ARPES_MnTe_Direct_with_large_blisters_Ekinsweep_240618_122202/ARPES_MnTe_Direct_FOV4p0_Iris_with large blisters_240618_122202/Sum'
 
         #get data from directory
         self.tif = []

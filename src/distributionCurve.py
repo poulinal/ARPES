@@ -3,8 +3,8 @@ from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
 from PyQt6.QtWidgets import QGraphicsView, QPushButton
 import numpy as np
 
-from commonWidgets import save_button_com, save_file_com, error_dialogue_com
-from commonWidgets import configure_graph_com, setup_figure_com, remap, rescale
+from src.commonWidgets import save_button_com, save_file_com, error_dialogue_com
+from src.commonWidgets import configure_graph_com, setup_figure_com, remap, rescale
 
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure

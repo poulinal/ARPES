@@ -5,16 +5,16 @@ from PyQt6.QtWidgets import QFileDialog, QGraphicsView
 from PyQt6.QtWidgets import QLineEdit, QPushButton, QComboBox
 from PyQt6.QtGui import QPixmap, QPainter, QPen, QColor, QIntValidator
 from PyQt6.QtCore import Qt, QDir, QPoint
-from tifConv import tiff_im, get_info
-from energyVmomentum import EnergyVMomentum
+from src.tifConv import tiff_im, get_info
+from src.energyVmomentum import EnergyVMomentum
 from PIL import Image, ImageQt
 import numpy as np
 import os, sys
-from commonWidgets import reset_button_com, setup_figure_com, configure_graph_com
-import buildImage
-import fileWork
+from src.commonWidgets import reset_button_com, setup_figure_com, configure_graph_com
+import src.buildImage
+import src.fileWork
 import matplotlib.pyplot as plt
-from tifConv import get_energies
+from src.tifConv import get_energies
 
 class ARPESGUI(QMainWindow):
     def __init__(self):
@@ -65,7 +65,7 @@ class ARPESGUI(QMainWindow):
 
     #setup the basic ui elements
     def setup_UI(self):
-        files = fileWork.files()
+        files = src.fileWork.files()
         self.dir_path = files.dir_path
         self.dat = files.dat
         #self.energies = files.energies
@@ -78,7 +78,7 @@ class ARPESGUI(QMainWindow):
         
         #Main figure
         setup_figure_com(self)
-        self.imageBuilder = buildImage.ImageBuilder()
+        self.imageBuilder = src.buildImage.ImageBuilder()
         self.imageBuilder.build_image(self, 0)
         self.ax.axis('off')  # Turn off axes
         self.ax.autoscale(False)
