@@ -1,10 +1,17 @@
+import numpy as np
+
 class ImageBuilder():
     #build EM plot
+    #other is the object class that is calling the function
     def build_image(self, other, im):
         #self.ax.clear() # discards the old graph
         if (other._plot_ref[0] is None):
             #print("new")
-            plot_refs = other.ax.imshow(other.tifArr[im], cmap='gray')
+            print(im)
+            new_vmin = np.min(other.tifArr[im])
+            new_vmax = np.max(other.tifArr[im])
+            print(f"vmin: {new_vmin}, vmax: {new_vmax}")
+            plot_refs = other.ax.imshow(other.tifArr[im], cmap='gray', vmin = new_vmin, vmax = new_vmax)
             print(plot_refs)
             other._plot_ref[0] = plot_refs
         else:

@@ -1,11 +1,13 @@
 ### 2024 Alex Poulin
 from PyQt6.QtWidgets import QLabel, QHBoxLayout, QVBoxLayout, QWidget
-from PyQt6.QtWidgets import QGraphicsView, QPushButton
+from PyQt6.QtWidgets import QGraphicsView, QPushButton, QLineEdit
 import numpy as np
 
 from src.distributionCurve import DistCrve
 from src.tifConv import get_energies
 from src.commonWidgets import save_button_com, save_file_com, error_dialogue_com, configure_graph_com, setup_figure_com, reset_button_com
+
+from src.widgets.colorramp import ColorRampWidget
 
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -35,22 +37,32 @@ class EnergyVMomentum(QWidget):
         self.energiesLow = None
         self.energiesHigh = None
         
+        self.maxcontrast = 10000
+        self.vmin = None
+        self.vmax = None
+        self._plot_ref = [None, None]
+        
         # We need to store a reference to the plotted line
         # somewhere, so we can apply the new data to it.
         self._plot_ref = [None, None, None, None]
         
         #setup window
         self.setWindowTitle("Energy vs Momentum Plot")
+        self.mainWindow = QVBoxLayout()
         self.layoutRow1 = QHBoxLayout()
         self.layoutCol1 = QVBoxLayout()
         self.layoutCol2 = QVBoxLayout()
+        self.layoutBottomMostRow = QHBoxLayout()
         #setup_UI
         self.setup_UI()
         #finialize layout
         self.layoutCol2.addWidget(self.canvas)
         self.layoutRow1.addLayout(self.layoutCol1)
         self.layoutRow1.addLayout(self.layoutCol2)
-        self.setLayout(self.layoutRow1)
+        self.mainWindow.addLayout(self.layoutRow1)
+        self.mainWindow.addLayout(self.layoutBottomMostRow)
+        
+        self.setLayout(self.mainWindow)
         
     def setup_UI(self):
         save_button_com(self, "Save File")
@@ -78,6 +90,37 @@ class EnergyVMomentum(QWidget):
         self.show()
         #self.ax = self.figure.add_subplot(111)
         self.build_EM()
+        self.configure_graph()
+        
+        
+        #setup contrast slider
+        contrastVLayout = QVBoxLayout()
+        contrastH1Layout = QHBoxLayout()
+        contrastH2Layout = QHBoxLayout()
+        
+        # Create sliders
+        self.contrast_slider = ColorRampWidget()
+        
+        # Create labels to display slider values
+        self.label_left = QLabel("Left: 0.00")
+        self.label_right = QLabel(f"Right: {self.maxcontrast:.2f}")
+        self.maxConstrastInput = QLineEdit()
+        self.maxConstrastInput.setFixedWidth(100)
+        self.maxConstrastInput.setText(f"{self.maxcontrast:.2f}")
+        
+        # Connect the slider signals
+        self.contrast_slider.valueChanged.connect(self.update_contrast)
+        self.maxConstrastInput.editingFinished.connect(self.update_maxcontrast)
+
+        # Add widgets to layout
+        contrastH1Layout.addWidget(self.contrast_slider)
+        contrastH1Layout.setStretch(0, 1)
+        contrastH2Layout.addWidget(self.label_left)
+        contrastH2Layout.addWidget(self.label_right)
+        contrastH2Layout.addWidget(self.maxConstrastInput)
+        contrastVLayout.addLayout(contrastH1Layout)
+        contrastVLayout.addLayout(contrastH2Layout)
+        self.layoutBottomMostRow.addLayout(contrastVLayout)
         
         #setup reset button
         reset_button_com(self)
@@ -125,6 +168,21 @@ class EnergyVMomentum(QWidget):
     def plot_mouse_release(self, e):
         self.tracking = False
         
+    def update_contrast(self, blackvalue, whitevalue):
+        #print(f"black: {blackvalue}, white: {whitevalue}")
+        self.vmin = blackvalue * self.maxcontrast
+        self.vmax = whitevalue * self.maxcontrast
+        self.label_left.setText(f"Left: {self.vmin:.2f}")
+        self.label_right.setText(f"Right: {self.vmax:.2f}")
+        #self.slider_right.setMinimum(value)
+        #self._plot_ref[0].set_clim(vmin=self.vmin)
+        self.build_EM()
+        #self.update()
+    
+    def update_maxcontrast(self):
+        self.maxcontrast = float(self.maxConstrastInput.text())
+        self.label_right.setText(f"{self.maxcontrast:.2f}")
+        
     #build EM plot
     def build_EM(self):
         #self.ax.clear() # discards the old graph
@@ -133,12 +191,31 @@ class EnergyVMomentum(QWidget):
         #set range and plot
         self.energiesLow = energies[0]
         self.energiesHigh = energies[len(energies)-1]
-        self.ax.imshow(self.result, cmap='gray', extent=[0, self.result.shape[1], 
-                                                         self.energiesLow, self.energiesHigh])
+        
+        if (self._plot_ref[0] is None):
+            #print("new")
+            new_vmin = np.min(self.result)
+            new_vmax = np.max(self.result)
+            plot_refs = self.ax.imshow(self.result, cmap='gray',extent=[0, self.result.shape[1],
+                                                                self.energiesLow, self.energiesHigh], vmin = new_vmin, vmax = new_vmax)
+            #print(plot_refs)
+            self._plot_ref[0] = plot_refs
+        else:
+            #print("override")
+            #plot_refs = self.ax.imshow(self.tifArr[im], cmap='gray', vmin = self.vmin, vmax = self.vmax)
+            #print(self.tifArr[im])
+            self._plot_ref[0].set_data(self.result)
+        if (self.vmax is not None and self.vmin is not None):
+            self._plot_ref[0].set_clim(vmin=self.vmin, vmax=self.vmax)
+        elif (self.vmin is not None):
+            self._plot_ref[0].set_clim(vmin=self.vmin)
+        elif (self.vmax is not None):
+            self._plot_ref[0].set_clim(vmax=self.vmax)
+        
+
         #remap to the energies of the experiment
         self.ax.set_aspect(self.result.shape[1] / (energies[len(energies)-1] - energies[0]))
         # refresh canvas
-        self.configure_graph()
         self.canvas.draw()
     
     #create the boxed area

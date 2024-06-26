@@ -10,11 +10,13 @@ from src.energyVmomentum import EnergyVMomentum
 from PIL import Image, ImageQt
 import numpy as np
 import os, sys
-from src.commonWidgets import reset_button_com, setup_figure_com, configure_graph_com
+from src.widgets.colorramp import ColorRampWidget
+from src.commonWidgets import reset_button_com, setup_figure_com, configure_graph_com, save_button_com
 import src.buildImage
 import src.fileWork
 import matplotlib.pyplot as plt
 from src.tifConv import get_energies
+from src.saveMov import ArrayToVideo
 
 class ARPESGUI(QMainWindow):
     def __init__(self):
@@ -32,7 +34,9 @@ class ARPESGUI(QMainWindow):
         self.lastIm = 0
         self.vmin = None
         self.vmax = None
+        self.maxcontrast = 10000
         self._plot_ref = [None, None] #first is main plot, second is line
+        self.iris = False
 
         # Set up the main window
         self.setWindowTitle("DeLTA Lab ARPES GUI")
@@ -71,6 +75,15 @@ class ARPESGUI(QMainWindow):
         #self.energies = files.energies
         tif = files.tif
         self.tifArr = tiff_im(self.dir_path, tif)
+        self.iris = files.iris
+        if self.iris:
+            print(f"before: {self.tifArr[0][0]}")
+            iris_flat_tif = files.iris_flat_tif
+            self.iris_flat_arr = tiff_im(files.iris_path, iris_flat_tif)
+            print(f"iris: {self.iris_flat_arr[0][0]}")
+            self.tifArr = np.divide(self.tifArr, self.iris_flat_arr)
+            self.iris_flat_dat = files.iris_flat_dat
+            print(f"after: {self.tifArr[0][0]}")
         
         self.energyArr = get_energies(self.dir_path, self.dat)
         
@@ -90,10 +103,6 @@ class ARPESGUI(QMainWindow):
         slider.setRange(0, len(tif) - 1)  # Set the range of the slider to the number of images
         slider.valueChanged.connect(self.slider_value_changed) #on change, call slider_value_changed
         self.layoutCol1.addWidget(slider, stretch=1)  # Add the slider to the layout with stretch=1 to make it take full width
-        
-        #setup resetbutton
-        reset_button_com(self)
-        self.layoutCol2Row6.addWidget(self.resetButton)
         
         #setup submit button
         submitButton = QPushButton("Submit")
@@ -144,29 +153,36 @@ class ARPESGUI(QMainWindow):
         for w in controlWidgetList2:
             self.layoutCol2Row3.addWidget(w)
         
+        
+        
+        
+        contrastVLayout = QVBoxLayout()
+        contrastH1Layout = QHBoxLayout()
+        contrastH2Layout = QHBoxLayout()
+        
         # Create sliders
-        self.slider_left = QSlider(Qt.Orientation.Horizontal)
-        self.slider_right = QSlider(Qt.Orientation.Horizontal)
-
-        # Set slider ranges
-        self.slider_left.setMinimum(0)
-        self.slider_left.setMaximum(6499)
-        self.slider_right.setMinimum(150000)
-        self.slider_right.setMaximum(350000)
-
+        self.contrast_slider = ColorRampWidget()
+        
         # Create labels to display slider values
-        self.label_left = QLabel("Left: 0")
-        self.label_right = QLabel("Right: 100")
+        self.label_left = QLabel("Left: 0.00")
+        self.label_right = QLabel(f"Right: {self.maxcontrast:.2f}")
+        self.maxConstrastInput = QLineEdit()
+        self.maxConstrastInput.setFixedWidth(100)
+        self.maxConstrastInput.setText(f"{self.maxcontrast:.2f}")
+        
+        # Connect the slider signals
+        self.contrast_slider.valueChanged.connect(self.update_contrast)
+        self.maxConstrastInput.editingFinished.connect(self.update_maxcontrast)
 
         # Add widgets to layout
-        self.layoutCol2Row4.addWidget(self.slider_left)
-        self.layoutCol2Row4.addWidget(self.slider_right)
-        self.layoutCol2Row4.addWidget(self.label_left)
-        self.layoutCol2Row4.addWidget(self.label_right)
-
-        # Connect signals
-        self.slider_left.valueChanged.connect(self.update_label_left)
-        self.slider_right.valueChanged.connect(self.update_label_right)
+        contrastH1Layout.addWidget(self.contrast_slider)
+        contrastH1Layout.setStretch(0, 1)
+        contrastH2Layout.addWidget(self.label_left)
+        contrastH2Layout.addWidget(self.label_right)
+        contrastH2Layout.addWidget(self.maxConstrastInput)
+        contrastVLayout.addLayout(contrastH1Layout)
+        contrastVLayout.addLayout(contrastH2Layout)
+        self.layoutCol2Row4.addLayout(contrastVLayout)
         
         # Connect the mouse events
         self.canvas.mpl_connect('button_press_event', self.plot_mouse_click)
@@ -178,6 +194,14 @@ class ARPESGUI(QMainWindow):
         self.colormap.addItems(plt.colormaps())
         self.layoutCol2Row5.addWidget(self.colormap)
         self.colormap.currentTextChanged.connect(self.change_colormap)
+        
+        save_button_com(self, "Save File")
+        self.layoutCol2Row6.addWidget(self.save_button)
+        self.save_button.clicked.connect(self.save_file)
+        
+        #setup resetbutton
+        reset_button_com(self)
+        self.layoutCol2Row6.addWidget(self.resetButton)
     
     #resets the line
     def reset_line(self):
@@ -225,21 +249,20 @@ class ARPESGUI(QMainWindow):
             self.make_line((self.lastx, self.lasty))
             '''
             
-    def update_label_left(self, value):
-        self.vmin = value / 100
-        self.label_left.setText(f"Left: {self.vmin}")
+    def update_contrast(self, blackvalue, whitevalue):
+        #print(f"black: {blackvalue}, white: {whitevalue}")
+        self.vmin = blackvalue * self.maxcontrast
+        self.vmax = whitevalue * self.maxcontrast
+        self.label_left.setText(f"Left: {self.vmin:.2f}")
+        self.label_right.setText(f"Right: {self.vmax:.2f}")
         #self.slider_right.setMinimum(value)
         #self._plot_ref[0].set_clim(vmin=self.vmin)
         self.imageBuilder.build_image(self, self.lastIm)
         #self.update()
     
-    def update_label_right(self, value):
-        self.vmax = value / 100
-        self.label_right.setText(f"Right: {self.vmax}")
-        #self._plot_ref[0].set_clim(vmax=self.vmax)
-        self.imageBuilder.build_image(self, self.lastIm)
-        #self.slider_left.setMaximum(value - 1)
-        #self.update()
+    def update_maxcontrast(self):
+        self.maxcontrast = float(self.maxConstrastInput.text())
+        self.label_right.setText(f"{self.maxcontrast:.2f}")
     
     #start point on click
     def plot_mouse_click(self, e):
@@ -301,41 +324,27 @@ class ARPESGUI(QMainWindow):
     def extend_line(self, pos):
         xlim = self.ax.get_xlim()
         ylim = self.ax.get_ylim() #this is max height then the minimum
-        #self.ax.set_xlim(xlim)
-        #self.ax.set_ylim(ylim)
-        #print(f"xlim: {xlim}, ylim: {ylim}")
 
         distance = np.sqrt((pos[0] - self.startx)**2 + (pos[1] - self.starty)**2)
         
-        #print(f"self.startx: {self.startx}, self.starty: {self.starty}")
-        #print(f"pos[0]: {pos[0]}, pos[1]: {pos[1]}")
         if self.startx == pos[0]: #verticle line
             x_ext = np.full(int(ylim[0] - ylim[1]), self.startx)
             y_ext = np.linspace(ylim[1], ylim[0], int(ylim[0] - ylim[1]))
-            #print(f"verticle, x_ext: {x_ext}, y_ext: {y_ext}")
             return (x_ext, y_ext), distance 
         
         fx = np.polyfit([self.startx, pos[0]], [self.starty, pos[1]], deg=1)
         fy = np.polyfit([self.starty, pos[1]], [self.startx, pos[0]], deg=1)
-        #print(fx)
         
         #here start means where xintercept is, and final means where the line would intersect with the upperbound of the box (i.e. the right side for x)
         xfinal = np.poly1d(fy)(xlim[1])
         yfinal = np.poly1d(fx)(ylim[0])
         xstart = np.poly1d(fy)(xlim[0])
         ystart = np.poly1d(fx)(ylim[1])
-        #print(f"\nxfinal: {xfinal}, yfinal: {yfinal}")
-        #print(f"xstart: {xstart}, ystart: {ystart}\n")
         
         xstart = np.clip(xstart, xlim[0], xlim[1]) #make sure it doesn't go out of bounds
         ystart = np.clip(ystart, ylim[1], ylim[0])
         xfinal = np.clip(xfinal, xlim[0], xlim[1])
         yfinal = np.clip(yfinal, ylim[1], ylim[0])
-        #print(f"new xstart: {xstart}, ystart: {ystart}")
-        #print(f"new xfinal: {xfinal}, yfinal: {yfinal}")
-        
-        #x_ext = np.linspace(xlim[0], xlim[1], int(distance))
-        #y_ext = np.poly1d(fx)(x_ext)
         
         if (min(xstart, xfinal) == xlim[0] and max(xstart, xfinal) == xlim[1]):
             #horizontal
@@ -377,16 +386,6 @@ class ARPESGUI(QMainWindow):
             x_ext = np.linspace(xlim[0], xlim[1], int(distance))
             y_ext = np.linspace(ystart, ystart, int(distance))
         
-        '''
-        distance = np.sqrt((xfinal - xstart)**2 + (yfinal - ystart)**2)
-        x_ext = np.linspace(min(xstart, xfinal), max(xstart, xfinal), int(distance))
-        y_ext = np.linspace(min(ystart, yfinal), max(ystart, yfinal), int(distance))
-        '''
-        
-        #print(f"x_ext: {x_ext}, y_ext: {y_ext}")
-        #print(x_ext)
-        #print(y_ext)
-        
         return (x_ext, y_ext), distance
         
     #interpolate the line to go across the image
@@ -404,9 +403,16 @@ class ARPESGUI(QMainWindow):
         imIndex = 0
         for tiffIm in self.tifArr:
             for i in range(result.shape[1]):
-                result[imIndex][i] = int(tiffIm[int(posExt[0][i])][int(posExt[1][i])])
+                dataPoint = tiffIm[int(posExt[0][i])][int(posExt[1][i])]
+                if self.vmin is not None and self.vmax is not None:
+                    #print(f"datapoint: {dataPoint}")
+                    #dataPoint = (dataPoint - self.vmin) / (self.vmax - self.vmin)
+                    dataPoint = np.clip(dataPoint, self.vmin, self.vmax)
+                    #print(f"new datapoint: {dataPoint}")
+                result[imIndex][i] = dataPoint
             imIndex += 1
         result = result.astype(float)
+        #print(result)
         
         result = np.flip(result, axis=0)
         
@@ -417,5 +423,9 @@ class ARPESGUI(QMainWindow):
         self.w = EnergyVMomentum(result, self.dir_path, self.tifArr, self.dat)
         #w.result = result
         self.w.show()
+        
+    #save the file
+    def save_file(self):
+        ArrayToVideo(self.tifArr, self.vmin, self.vmax, self)
         
         
