@@ -61,7 +61,7 @@ class ArrayToVideo():
                 fig.canvas.draw()
 
                 # Convert matplotlib figure to numpy array
-                img_np = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+                img_np = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint32)
                 img_np = img_np.reshape(fig.canvas.get_width_height()[::-1] + (3,))
                 
                 #print(img_np)

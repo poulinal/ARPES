@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QFileDialog, QMessageBox, QPushButton
+from PyQt6.QtWidgets import QFileDialog, QMessageBox, QPushButton, QDialogButtonBox
 from PyQt6.QtCore import QDir
 
 import numpy as np
@@ -6,6 +6,10 @@ import os, sys
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
+from subprocess import check_call as run 
+from getopt import getopt, GetoptError 
+
+from src.widgets.QFileDialogFlatField import QFileDialogFlatFieldWidget
 
 #remaps to the energy range
 def remap(value, start1, stop1, start2, stop2):
@@ -109,9 +113,73 @@ def reset_button_com(self):
 #returns the path of the folder selected by the user
 def get_folder(self):
     #print("Get folder")
-    dir_path = QFileDialog.getExistingDirectory(
+    #buttonBox = self.findChild(QDialogButtonBox)
+    flatfield_correction = False
+    flatfield_path = None
+    correctionFunc = lambda correction : not correction
+    
+    flatfieldButton = QPushButton("Select Folder")
+    #flatfieldButton.clicked.connect(correctionFunc(flatfield_correction))
+    
+    #buttonBox.addButton(flatfieldButton)
+    #buttonBox = QFileDialogFlatFieldWidget()
+    buttonBox = QFileDialog()
+    buttonBox.layout.addWidget(flatfieldButton)
+    dir_path = buttonBox.getExistingDirectory(
         #parent=self,
         caption="Select directory",
         directory=QDir().homePath(),
         options=QFileDialog.Option.DontUseNativeDialog)
-    return dir_path
+    if flatfield_correction:
+        flatfield_path = QFileDialog.getExistingDirectory(
+            #parent=self,
+            caption="Select directory",
+            directory=QDir().homePath(),
+            options=QFileDialog.Option.DontUseNativeDialog)
+    return dir_path, flatfield_path
+
+
+
+
+RELEASE = 'master' # default release 
+SRC_DIR = "$HOME/.src" # checkout directory 
+UPDATE_CMD = ( # base command 
+'pip install --src="%s" --upgrade -e ' 
+'git://github.com/poulinal/ARPES.git@%s#egg=ARPES' 
+)
+#@command 
+def update(args): 
+    try: 
+        opts, args = getopt(args, 'sr:', ['sudo', 'src=', 'release=', 'commit=']) 
+    except GetoptError as err: 
+        #log(err) 
+        print(err)
+        #usage(error_codes['option'])
+
+    sudo = False 
+    src_dir = SRC_DIR 
+    release = RELEASE 
+    commit = None 
+    for opt, arg in opts: 
+        if opt in ('-s', '--sudo'): 
+            sudo = True 
+        elif opt in ('-r', '--release'): 
+            release = arg 
+        elif opt in ('--src',): 
+            src_dir = arg 
+        elif opt in ('--commit',): 
+            commit = arg
+
+    if release[0].isdigit(): ## Check if it is a version 
+        release = 'r' + release 
+    release = 'origin/' + release ## assume it is a branch
+
+    if commit is not None: ## if a commit is supplied use that 
+        cmd = UPDATE_CMD % (src_dir, commit) 
+    else: 
+        cmd = UPDATE_CMD % (src_dir, release)
+
+    if sudo: 
+        run('sudo %s' % cmd) 
+    else: 
+        run(cmd)

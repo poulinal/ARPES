@@ -69,23 +69,7 @@ class ARPESGUI(QMainWindow):
 
     #setup the basic ui elements
     def setup_UI(self):
-        files = src.fileWork.files()
-        self.dir_path = files.dir_path
-        self.dat = files.dat
-        #self.energies = files.energies
-        tif = files.tif
-        self.tifArr = tiff_im(self.dir_path, tif)
-        self.iris = files.iris
-        if self.iris:
-            print(f"before: {self.tifArr[0][0]}")
-            iris_flat_tif = files.iris_flat_tif
-            self.iris_flat_arr = tiff_im(files.iris_path, iris_flat_tif)
-            print(f"iris: {self.iris_flat_arr[0][0]}")
-            self.tifArr = np.divide(self.tifArr, self.iris_flat_arr)
-            self.iris_flat_dat = files.iris_flat_dat
-            print(f"after: {self.tifArr[0][0]}")
-        
-        self.energyArr = get_energies(self.dir_path, self.dat)
+        self.setup_data()
         
         #print(self.tifArr)
         
@@ -202,6 +186,27 @@ class ARPESGUI(QMainWindow):
         #setup resetbutton
         reset_button_com(self)
         self.layoutCol2Row6.addWidget(self.resetButton)
+        
+    def setup_data(self):
+        files = src.fileWork.files()
+        self.dir_path = files.dir_path
+        self.dat = files.dat
+        #self.energies = files.energies
+        tif = files.tif
+        self.tifArr = tiff_im(self.dir_path, tif)
+        self.iris = files.flatfield_path
+        if self.iris is not None:
+            #print(f"before: {self.tifArr[0][0]}")
+            flatfield_tif = files.flatfield_tif
+            self.flatfield_arr = tiff_im(files.flatfield_path, flatfield_tif)
+            #print(f"iris: {self.iris_flat_arr[0][0]}")
+            self.tifArr = np.divide(self.tifArr, self.flatfield_arr)
+            #self.flatfield_dat = files.flatfield_dat
+            #print(f"after: {self.tifArr[0][0]}")
+        
+        self.energyArr = get_energies(self.dir_path, self.dat)
+    
+    
     
     #resets the line
     def reset_line(self):
