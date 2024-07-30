@@ -44,8 +44,10 @@ class HOMEGUI(QMainWindow):
         print("Left button clicked")
         self.w = ARPESGUI()
         self.w.show()
+        self.close()
 
     def xps_button_clicked(self):
         print("Right button clicked")
         self.w = XPSGUI()
         self.w.show()
+        self.close()

@@ -41,6 +41,7 @@ Eventually I will build an executable that can simply be double tapped (and even
 
 **Other notes**
 some dependencies this repository relies on:
+PyQt6
 numpy
 matplotlib
 pillow

@@ -1,6 +1,6 @@
 ### 2024 Alex Poulin
 from PyQt6.QtWidgets import QLabel, QHBoxLayout, QVBoxLayout, QWidget
-from PyQt6.QtWidgets import QGraphicsView, QPushButton, QLineEdit
+from PyQt6.QtWidgets import QGraphicsView, QPushButton, QLineEdit, QCheckBox
 import numpy as np
 
 from src.distributionCurve import DistCrve
@@ -11,10 +11,9 @@ from src.widgets.colorramp import ColorRampWidget
 
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-"""
-This "window" is a QWidget. If it has no parent, it
-will appear as a free-floating window as we want.
-"""
+
+from scipy.ndimage import gaussian_filter
+
 class EnergyVMomentum(QWidget):
     def __init__(self, results, path, tifArr, dat):
         super().__init__()
@@ -36,6 +35,7 @@ class EnergyVMomentum(QWidget):
         #self.info = info
         self.energiesLow = None
         self.energiesHigh = None
+        self.gaussian = False #duplicate code, eventually want to consolidate
         
         self.maxcontrast = 10000
         self.vmin = None
@@ -78,6 +78,11 @@ class EnergyVMomentum(QWidget):
         self.intXButton.clicked.connect(self.integrate)
         self.intYButton.clicked.connect(self.integrate)
         self.save_button.clicked.connect(self.save_file)
+        
+        #gaussian toggle checkbox
+        self.gaussianToggle = QCheckBox("Apply Gaussian Filter")
+        self.gaussianToggle.stateChanged.connect(self.toggleGaussian)
+        self.layoutCol1.addWidget(self.gaussianToggle)
         
         #setupFigure
         setup_figure_com(self)
@@ -138,6 +143,16 @@ class EnergyVMomentum(QWidget):
         #self.resetButton.hide()
         #self.update()
         
+    def toggleGaussian(self):
+        self.gaussian = not self.gaussian
+        self.build_EM()
+    
+    def getImage(self):
+        if self.gaussian:
+            return gaussian_filter(self.result, sigma = 1.5)
+        else:
+            return self.result
+        
     #start point on click
     def plot_mouse_click(self, e):
         #self.resetButton.show()
@@ -196,7 +211,7 @@ class EnergyVMomentum(QWidget):
             #print("new")
             new_vmin = np.min(self.result)
             new_vmax = np.max(self.result)
-            plot_refs = self.ax.imshow(self.result, cmap='gray',extent=[0, self.result.shape[1],
+            plot_refs = self.ax.imshow(self.getImage(), cmap='gray',extent=[0, self.result.shape[1],
                                                                 self.energiesLow, self.energiesHigh], vmin = new_vmin, vmax = new_vmax)
             #print(plot_refs)
             self._plot_ref[0] = plot_refs
@@ -204,7 +219,7 @@ class EnergyVMomentum(QWidget):
             #print("override")
             #plot_refs = self.ax.imshow(self.tifArr[im], cmap='gray', vmin = self.vmin, vmax = self.vmax)
             #print(self.tifArr[im])
-            self._plot_ref[0].set_data(self.result)
+            self._plot_ref[0].set_data(self.getImage())
         if (self.vmax is not None and self.vmin is not None):
             self._plot_ref[0].set_clim(vmin=self.vmin, vmax=self.vmax)
         elif (self.vmin is not None):

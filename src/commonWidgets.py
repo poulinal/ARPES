@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QFileDialog, QMessageBox, QPushButton, QDialogButtonBox
+from PyQt6.QtWidgets import QFileDialog, QMessageBox, QPushButton, QDialogButtonBox, QVBoxLayout, QGroupBox, QLineEdit, QHBoxLayout, QCheckBox
 from PyQt6.QtCore import QDir
 
 import numpy as np
@@ -109,34 +109,6 @@ def reset_button_com(self):
     self.resetButton.clicked.connect(self.reset_line)
     #self.resetButton.hide()
     self.resetButton.setStyleSheet("color : rgba(0, 0, 0, 0); background-color : rgba(0, 0, 0, 0); border : 0px solid rgba(0, 0, 0, 0);")
-
-#returns the path of the folder selected by the user
-def get_folder(self):
-    #print("Get folder")
-    #buttonBox = self.findChild(QDialogButtonBox)
-    flatfield_correction = False
-    flatfield_path = None
-    correctionFunc = lambda correction : not correction
-    
-    flatfieldButton = QPushButton("Select Folder")
-    #flatfieldButton.clicked.connect(correctionFunc(flatfield_correction))
-    
-    #buttonBox.addButton(flatfieldButton)
-    #buttonBox = QFileDialogFlatFieldWidget()
-    buttonBox = QFileDialog()
-    buttonBox.layout.addWidget(flatfieldButton)
-    dir_path = buttonBox.getExistingDirectory(
-        #parent=self,
-        caption="Select directory",
-        directory=QDir().homePath(),
-        options=QFileDialog.Option.DontUseNativeDialog)
-    if flatfield_correction:
-        flatfield_path = QFileDialog.getExistingDirectory(
-            #parent=self,
-            caption="Select directory",
-            directory=QDir().homePath(),
-            options=QFileDialog.Option.DontUseNativeDialog)
-    return dir_path, flatfield_path
 
 
 
