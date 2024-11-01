@@ -43,7 +43,7 @@ class ARPESGUI(QMainWindow):
         self.gaussian = False
 
         # Set up the main window
-        self.setWindowTitle("DeLTA Lab ARPES GUI")
+        self.setWindowTitle("ARDA")
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
 
@@ -90,6 +90,7 @@ class ARPESGUI(QMainWindow):
         self.imageBuilder.build_image(self, self.tifArr[0])
         self.ax.axis('off')  # Turn off axes
         self.ax.autoscale(False)
+        
         self.layoutCol1Row2.addWidget(self.canvas)
         #print(plt.colormaps())
         
@@ -224,6 +225,7 @@ class ARPESGUI(QMainWindow):
         self.files.get_folder()
         self.dir_path = self.files.dir_path
         self.dat = self.files.dat
+        print(f"dir_path: {self.dir_path}")
         #self.energies = files.energies
         self.tif = self.files.tif
         self.tifArr = tiff_im(self.dir_path, self.tif)
@@ -235,6 +237,7 @@ class ARPESGUI(QMainWindow):
         self.imageBuilder.build_image(self, self.getImage())
         self.slider.setEnabled(True)
         self.slider.setRange(0, len(self.tif) - 1)
+        self.info.setText(self.get_info())
     
         
     def get_flatfield_data(self):
@@ -272,18 +275,24 @@ class ARPESGUI(QMainWindow):
         self.textLineY.setText("")
         self.textLineFinalX.setText("")
         self.textLineFinalY.setText("")
+        
+        
+        self.lastx = None
+        self.lasty = None
+        self.startx = None
+        self.starty = None
+        
+        
         #self.image_label.setPixmap(QPixmap.fromImage(ImageQt.ImageQt(self.im)))
         self.resetButton.setStyleSheet("color : rgba(0, 0, 0, 0); background-color : rgba(0, 0, 0, 0); border : 0px solid rgba(0, 0, 0, 0);")
         self.resetButton.hide()
         
-        self.ax.cla()
-        self._plot_ref[1] = None
-        ############ FIX BELOW LINE (doesnt keep the flatfield correction) ###############3
-        self.imageBuilder.build_image(self, self.getImage())
-        self.ax.axis('off')  # Turn off axes
+        #self.ax.cla()
         #self._plot_ref[1] = None
-        #self.canvas.draw()
-        #self.update()
+        self._plot_ref[1].set_xdata(0)
+        self._plot_ref[1].set_ydata(0)
+        ############ note this is just a bandaid fix, not really good practice ###############3
+        self.canvas.draw()
         
     def change_colormap(self, text):
         self._plot_ref[0].set_cmap(text)
@@ -413,7 +422,7 @@ class ARPESGUI(QMainWindow):
         
         #here start means where xintercept is, and final means where the line would intersect with the upperbound of the box (i.e. the right side for x)
         xfinal = np.poly1d(fy)(xlim[1])
-        yfinal = np.poly1d(fx)(ylim[0])
+        yfinal = np.poly1d(fx)(ylim[0]) 
         xstart = np.poly1d(fy)(xlim[0])
         ystart = np.poly1d(fx)(ylim[1])
         
@@ -466,6 +475,8 @@ class ARPESGUI(QMainWindow):
         
     #interpolate the line to go across the image
     def interpl(self): 
+        if (self.lastx is None or self.lasty is None or self.startx is None or self.starty is None):
+            return
         posExt, distance = self.extend_line((self.lastx, self.lasty))
         #print(f"posExt: {posExt}")
         if (posExt[0] is None or posExt[1] is None):
@@ -478,12 +489,16 @@ class ARPESGUI(QMainWindow):
         #result = np.zeros(shape = (int(len(self.tifArr)), int(distance)))
         result = np.zeros(shape = (int(len(self.tifArr)), self.tifArr[0].shape[0])) #note shape is row, col
         imIndex = 0
+        print(f"posExt: {posExt}")
         for tiffIm in self.tifArr:
             for i in range(result.shape[1]):
                 #data point on the exact point (note posExt[0] is x coordinates along line, posExt[1] is y coordinates along line)
-                xpoint = int(posExt[0][i])
-                ypoint = int(posExt[1][i])
-                dataPoint = tiffIm[xpoint][ypoint]
+                nearestXPix = int(posExt[0][i])
+                nearestYPix = int(posExt[1][i])
+                
+                #gamma = self.distanceWeightedAverage(nearestXPix, nearestYPix, posExt[0], posExt[1], 2)
+                #dataPoint = gamma * tiffIm[nearestXPix][nearestYPix]
+                dataPoint = tiffIm[nearestXPix][nearestYPix]
                 
                 #posExt[0][i] gets the xpoint on that iteration
                 
@@ -492,36 +507,36 @@ class ARPESGUI(QMainWindow):
                 #dataPoint += tiff_im[int(posExt[0][i])][int(posExt[1][i])]
                 
                 
-                if (xpoint > 0): #can go to left for cluster
-                    dataPoint += tiffIm[xpoint - 1][ypoint]
+                if (nearestXPix > 0): #can go to left for cluster
+                    dataPoint += tiffIm[nearestXPix - 1][nearestYPix]
                     cluster_data += 1
                     
                     #diagonal left up and down
-                    if (ypoint > 0): #can go to up for cluster
-                        dataPoint += tiffIm[xpoint - 1][ypoint - 1]
+                    if (nearestXPix > 0): #can go to up for cluster
+                        dataPoint += tiffIm[nearestXPix - 1][nearestYPix - 1]
                         cluster_data += 1
-                    if (ypoint < self.tifArr[0].shape[0] - 1): #can go to down for cluster
-                        dataPoint += tiffIm[xpoint - 1][ypoint + 1]
+                    if (nearestXPix < self.tifArr[0].shape[0] - 1): #can go to down for cluster
+                        dataPoint += tiffIm[nearestXPix - 1][nearestYPix + 1]
                         cluster_data += 1
                     
-                if (xpoint < self.tifArr[0].shape[1] - 1): #can go to right for cluster
-                    dataPoint += tiffIm[xpoint + 1][ypoint]
+                if (nearestXPix < self.tifArr[0].shape[1] - 1): #can go to right for cluster
+                    dataPoint += tiffIm[nearestXPix + 1][nearestYPix]
                     cluster_data += 1
                     
                     #diagonal right up and down
-                    if (ypoint > 0): #can go to up for cluster
-                        dataPoint += tiffIm[xpoint + 1][ypoint - 1]
+                    if (nearestXPix > 0): #can go to up for cluster
+                        dataPoint += tiffIm[nearestXPix + 1][nearestYPix - 1]
                         cluster_data += 1
-                    if (ypoint < self.tifArr[0].shape[0] - 1): #can go to down for cluster
-                        dataPoint += tiffIm[xpoint + 1][ypoint + 1]
+                    if (nearestYPix < self.tifArr[0].shape[0] - 1): #can go to down for cluster
+                        dataPoint += tiffIm[nearestXPix + 1][nearestYPix + 1]
                         cluster_data += 1
                     
-                if (ypoint > 0): #can go to up for cluster
-                    dataPoint += tiffIm[xpoint][ypoint - 1]
+                if (nearestYPix > 0): #can go to up for cluster
+                    dataPoint += tiffIm[nearestXPix][nearestYPix - 1]
                     cluster_data += 1
                 
-                if (ypoint < self.tifArr[0].shape[0] - 1): #can go to down for cluster
-                    dataPoint += tiffIm[xpoint][ypoint + 1]
+                if (nearestYPix < self.tifArr[0].shape[0] - 1): #can go to down for cluster
+                    dataPoint += tiffIm[nearestXPix][nearestYPix + 1]
                     cluster_data += 1
                     
                 if cluster_data > 1:
@@ -554,5 +569,6 @@ class ARPESGUI(QMainWindow):
     #save the file
     def save_file(self):
         ArrayToVideo(self.tifArr, self.vmin, self.vmax, self)
+        
         
         
