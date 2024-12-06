@@ -4,12 +4,14 @@ Mucho work in progress
 
 
 **Dependancies:**
-`pip install pyqt6
+```
+pip install pyqt6
 pip install pillow
 pip install matplotlib
 pip install numpy
 pip install scipy
-pip install pandas`
+pip install pandas
+```
 
 
 Note expected updates are shown here: 
