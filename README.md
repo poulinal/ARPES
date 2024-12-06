@@ -1,6 +1,17 @@
 This is some prelimnary code to visualize ARPES data curtosy of DeLTA Lab and NanoESCA Labs at NEU.
 Mucho work in progress
 
+
+
+Dependancies:
+'''pip install pyqt6'''
+'''pip install pillow'''
+'''pip install matplotlib'''
+'''pip install numpy'''
+'''pip install scipy'''
+'''pip install pandas'''
+
+
 Note expected updates are shown here: 
 https://unleashed-ferret-f75.notion.site/cf8bb74aa9094069be2738f1d213716c?v=52b7674c89cf4d59bbe272ea2d87a0b6&pvs=4
 
