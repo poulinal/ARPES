@@ -1,46 +1,60 @@
-from subprocess import check_call as run 
-from getopt import getopt, GetoptError 
-RELEASE = 'master' # default release 
-SRC_DIR = "$HOME/.src" # checkout directory 
-UPDATE_CMD = ( # base command 
-'pip install --src="%s" --upgrade -e ' 
-#'git://github.com/timtadh/swork.git@%s#egg=swork' 
-'git://https://github.com/poulinal/ARPES.git@%s#egg=ARPES'
-)
+import os
+import subprocess
+import sys
+import time
 
-#@command 
-def update(args): 
-    try: 
-        opts, args = getopt(args, 'sr:', ['sudo', 'src=', 'release=', 'commit=']) 
-    except GetoptError as err: 
-        #log(err) 
-        #usage(error_codes['option'])
-        print(err)
+# Path to the Git repository (the directory containing this script)
+REPO_PATH = os.path.dirname(os.path.abspath(__file__))
 
-    sudo = False 
-    src_dir = SRC_DIR 
-    release = RELEASE 
-    commit = None 
-    for opt, arg in opts: 
-        if opt in ('-s', '--sudo'): 
-            sudo = True 
-        elif opt in ('-r', '--release'): 
-            release = arg 
-        elif opt in ('--src',): 
-            src_dir = arg 
-        elif opt in ('--commit',): 
-            commit = arg
+# Interval in seconds to check for updates
+CHECK_INTERVAL = 300  # e.g., 5 minutes
 
-    if release[0].isdigit(): ## Check if it is a version 
-        release = 'r' + release 
-    release = 'origin/' + release ## assume it is a branch
+def check_for_updates():
+    """
+    Pull the latest changes from the remote Git repository.
+    Returns True if updates were pulled, False otherwise.
+    """
+    try:
+        # Move to the repository path
+        os.chdir(REPO_PATH)
 
-    if commit is not None: ## if a commit is supplied use that 
-        cmd = UPDATE_CMD % (src_dir, commit) 
-    else: 
-        cmd = UPDATE_CMD % (src_dir, release)
+        # Fetch updates from the remote
+        fetch_output = subprocess.check_output(["git", "fetch"]).decode()
+        
+        # Check if there are updates
+        local_commit = subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()
+        remote_commit = subprocess.check_output(["git", "rev-parse", "@{u}"]).decode().strip()
 
-    if sudo: 
-        run('sudo %s' % cmd) 
-    else: 
-        run(cmd)
+        # If the commits are different, there are updates to pull
+        if local_commit != remote_commit:
+            print("Updates found, pulling changes...")
+            subprocess.check_call(["git", "pull"])
+            return True
+        else:
+            print("No updates found.")
+            return False
+    except subprocess.CalledProcessError as e:
+        print(f"Git command failed: {e}")
+        return False
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return False
+
+def restart_script():
+    """Restart the current Python script."""
+    print("Restarting script to apply updates...")
+    os.execv(sys.executable, [sys.executable] + sys.argv)
+
+def main():
+    """Main loop to periodically check for updates."""
+    while True:
+        print("Checking for updates...")
+        if check_for_updates():
+            print("Found Update... beginning...")
+            restart_script()
+        time.sleep(CHECK_INTERVAL)
+
+'''
+if __name__ == "__main__":
+    main()
+'''

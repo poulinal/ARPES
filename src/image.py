@@ -26,6 +26,9 @@ class ARPESGUI(QMainWindow):
         super().__init__()
         QGraphicsView.__init__(self, parent=None)
         
+        self.setGeometry(100, 100, 1024, 824)  # Window size
+        #window size where the first two are the position of the window and the last two are the size of the window (width, height)
+        
         #setup variables
         self.dir_path = ""  # Class variable to store the directory path
         self.tifArr = []  # Class variable to store the tiff images as an array
@@ -43,7 +46,7 @@ class ARPESGUI(QMainWindow):
         self.gaussian = False
 
         # Set up the main window
-        self.setWindowTitle("ARDA")
+        self.setWindowTitle("ARDA - Alexander Poulin")
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
 
@@ -51,6 +54,7 @@ class ARPESGUI(QMainWindow):
         self.layoutCol1 = QVBoxLayout()
         self.layoutCol1Row1 = QHBoxLayout()
         self.layoutCol1Row2 = QHBoxLayout()
+        self.layoutCol1Row2Col1 = QVBoxLayout()
         self.layoutCol1Row3 = QHBoxLayout()
         self.layoutCol2 = QVBoxLayout()
         self.layoutCol2Col1 = QVBoxLayout()
@@ -65,6 +69,7 @@ class ARPESGUI(QMainWindow):
         #finalize layout
         self.layoutCol1.addLayout(self.layoutCol1Row1)
         self.layoutCol1.addLayout(self.layoutCol1Row2)
+        self.layoutCol1Row2.addLayout(self.layoutCol1Row2Col1)
         self.layoutCol1.addLayout(self.layoutCol1Row3)
         layoutRow1.addLayout(self.layoutCol1)
         
@@ -86,12 +91,14 @@ class ARPESGUI(QMainWindow):
         
         #Main figure
         setup_figure_com(self)
+        self.layoutCol1Row2Col1.addWidget(self.toolbar)
         self.imageBuilder = src.buildImage.ImageBuilder()
         self.imageBuilder.build_image(self, self.tifArr[0])
         self.ax.axis('off')  # Turn off axes
         self.ax.autoscale(False)
+        #self.figure.tight_layout()
         
-        self.layoutCol1Row2.addWidget(self.canvas)
+        self.layoutCol1Row2Col1.addWidget(self.canvas)
         #print(plt.colormaps())
         
         #setup file button
@@ -430,7 +437,7 @@ class ARPESGUI(QMainWindow):
         ystart = np.clip(ystart, ylim[1], ylim[0])
         xfinal = np.clip(xfinal, xlim[0], xlim[1])
         yfinal = np.clip(yfinal, ylim[1], ylim[0])
-        
+
         if (min(xstart, xfinal) == xlim[0] and max(xstart, xfinal) == xlim[1]):
             #horizontal
             distance = np.sqrt((xlim[0] - xlim[1])**2 + (ystart - yfinal)**2)
@@ -491,14 +498,16 @@ class ARPESGUI(QMainWindow):
         imIndex = 0
         print(f"posExt: {posExt}")
         for tiffIm in self.tifArr:
-            for i in range(result.shape[1]):
+            for i in range(result.shape[1] - 1):
                 #data point on the exact point (note posExt[0] is x coordinates along line, posExt[1] is y coordinates along line)
                 nearestXPix = int(posExt[0][i])
                 nearestYPix = int(posExt[1][i])
                 
                 #gamma = self.distanceWeightedAverage(nearestXPix, nearestYPix, posExt[0], posExt[1], 2)
                 #dataPoint = gamma * tiffIm[nearestXPix][nearestYPix]
+                
                 dataPoint = tiffIm[nearestXPix][nearestYPix]
+                #dataPoint = self.distanceWeightedAverage(nearestXPix, nearestYPix, posExt[0][i], posExt[1][i], 2) * tiffIm[nearestXPix][nearestYPix]
                 
                 #posExt[0][i] gets the xpoint on that iteration
                 
@@ -509,35 +518,43 @@ class ARPESGUI(QMainWindow):
                 
                 if (nearestXPix > 0): #can go to left for cluster
                     dataPoint += tiffIm[nearestXPix - 1][nearestYPix]
+                    #dataPoint += self.distanceWeightedAverage(nearestXPix - 1, nearestYPix, posExt[0][i], posExt[1][i], 2) * tiffIm[nearestXPix - 1][nearestYPix]
                     cluster_data += 1
                     
                     #diagonal left up and down
                     if (nearestXPix > 0): #can go to up for cluster
                         dataPoint += tiffIm[nearestXPix - 1][nearestYPix - 1]
                         cluster_data += 1
+                        #dataPoint += self.distanceWeightedAverage(nearestXPix - 1, nearestYPix - 1, posExt[0][i], posExt[1][i], 2) * tiffIm[nearestXPix - 1][nearestYPix - 1]
                     if (nearestXPix < self.tifArr[0].shape[0] - 1): #can go to down for cluster
                         dataPoint += tiffIm[nearestXPix - 1][nearestYPix + 1]
                         cluster_data += 1
+                        #dataPoint += self.distanceWeightedAverage(nearestXPix - 1, nearestYPix + 1, posExt[0][i], posExt[1][i], 2) * tiffIm[nearestXPix - 1][nearestYPix + 1]
                     
                 if (nearestXPix < self.tifArr[0].shape[1] - 1): #can go to right for cluster
                     dataPoint += tiffIm[nearestXPix + 1][nearestYPix]
                     cluster_data += 1
+                    #dataPoint += self.distanceWeightedAverage(nearestXPix + 1, nearestYPix, posExt[0][i], posExt[1][i], 2) * tiffIm[nearestXPix + 1][nearestYPix]
                     
                     #diagonal right up and down
                     if (nearestXPix > 0): #can go to up for cluster
                         dataPoint += tiffIm[nearestXPix + 1][nearestYPix - 1]
                         cluster_data += 1
+                        #dataPoint += self.distanceWeightedAverage(nearestXPix + 1, nearestYPix - 1, posExt[0][i], posExt[1][i], 2) * tiffIm[nearestXPix + 1][nearestYPix - 1]
                     if (nearestYPix < self.tifArr[0].shape[0] - 1): #can go to down for cluster
                         dataPoint += tiffIm[nearestXPix + 1][nearestYPix + 1]
                         cluster_data += 1
+                        #dataPoint += self.distanceWeightedAverage(nearestXPix + 1, nearestYPix + 1, posExt[0][i], posExt[1][i], 2) * tiffIm[nearestXPix + 1][nearestYPix + 1]
                     
                 if (nearestYPix > 0): #can go to up for cluster
                     dataPoint += tiffIm[nearestXPix][nearestYPix - 1]
                     cluster_data += 1
+                    #dataPoint += self.distanceWeightedAverage(nearestXPix, nearestYPix - 1, posExt[0][i], posExt[1][i], 2) * tiffIm[nearestXPix][nearestYPix - 1]
                 
                 if (nearestYPix < self.tifArr[0].shape[0] - 1): #can go to down for cluster
                     dataPoint += tiffIm[nearestXPix][nearestYPix + 1]
                     cluster_data += 1
+                    #dataPoint += self.distanceWeightedAverage(nearestXPix, nearestYPix + 1, posExt[0][i], posExt[1][i], 2) * tiffIm[nearestXPix][nearestYPix + 1]
                     
                 if cluster_data > 1:
                     dataPoint = dataPoint / cluster_data
@@ -552,14 +569,22 @@ class ARPESGUI(QMainWindow):
                 result[imIndex][i] = dataPoint
             imIndex += 1
             
-            
         result = result.astype(float)
         #print(result)
-        
         result = np.flip(result, axis=0)
-        
         self.show_new_image(result)
         return
+    
+    
+    def distanceWeightedAverage(self, x, y, x_new, y_new, p):
+        ### p is the power of the distance
+        ### x and y are the coordinates of the point we are trying to find the value of
+        ### x_new and y_new are the coordinates of the point we are trying to find the value of
+        ### returns the weighted average of the point
+        gamma = 0
+        for i in range(len(x_new)):
+            gamma += (1 / (np.sqrt((x_new[i] - x)**2 + (y_new[i] - y)**2))**p)
+        return gamma
     
     def show_new_image(self, result):
         self.w = EnergyVMomentum(result, self.dir_path, self.tifArr, self.dat)

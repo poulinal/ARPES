@@ -1,3 +1,4 @@
+### 2024 Alex Poulin
 import numpy as np
 
 class ImageBuilder():
@@ -33,5 +34,7 @@ class ImageBuilder():
             other._plot_ref[0].set_clim(vmin=other.vmin)
         elif (other.vmax is not None):
             other._plot_ref[0].set_clim(vmax=other.vmax)
-
+            
+        #print(type(other._plot_ref[0]))
+        other.figure.tight_layout()
         other.canvas.draw()

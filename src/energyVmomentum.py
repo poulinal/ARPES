@@ -40,14 +40,15 @@ class EnergyVMomentum(QWidget):
         self.maxcontrast = 10000
         self.vmin = None
         self.vmax = None
-        self._plot_ref = [None, None]
+        #self._plot_ref = [None, None]
         
         # We need to store a reference to the plotted line
         # somewhere, so we can apply the new data to it.
         self._plot_ref = [None, None, None, None]
+        print(f"self._plot_ref: {self._plot_ref}")
         
         #setup window
-        self.setWindowTitle("Energy vs Momentum Plot")
+        self.setWindowTitle("Energy vs Momentum Plot - Alexander Poulin")
         self.mainWindow = QVBoxLayout()
         self.layoutRow1 = QHBoxLayout()
         self.layoutCol1 = QVBoxLayout()
@@ -86,6 +87,7 @@ class EnergyVMomentum(QWidget):
         
         #setupFigure
         setup_figure_com(self)
+        #self.layoutCol2.addWidget(self.toolbar)
         
         # Connect the mouse events
         self.canvas.mpl_connect('button_press_event', self.plot_mouse_click)
@@ -259,9 +261,11 @@ class EnergyVMomentum(QWidget):
         self.buildEM() 
         #this is clear and redrawing -- very laggy
         '''
+        
+        #print(f"self._plot_ref: {self._plot_ref[0]}")
         # Note: With this reference below, we no longer need to clear the axis.
         #Note: this takes more to store the references, but it is faster
-        if self._plot_ref[0] is None:
+        if self._plot_ref[0] is None or self._plot_ref[1] is None or self._plot_ref[2] is None or self._plot_ref[3] is None:
             # First time we have no plot reference, so do a normal plot.
             # .plot returns a list of line <reference>s, as we're
             # only getting one we can take the first element.
@@ -273,8 +277,16 @@ class EnergyVMomentum(QWidget):
             self._plot_ref[2] = plot_refs[0]
             plot_refs = self.ax.plot(dataRightX, dataRightY, '-', color='yellow')
             self._plot_ref[3] = plot_refs[0]
+            #print(f"dataTopX: {dataTopX}, dataTopY: {dataTopY}, dataBottomX: {dataBottomX}, dataBottomY: {dataBottomY}, dataLeftX: {dataLeftX}, dataLeftY: {dataLeftY}, dataRightX: {dataRightX}, dataRightY: {dataRightY}")
+            #print(type(self._plot_ref[0]))
         else:
             # We have a reference, we can use it to update the data for that line.
+            '''
+            self._plot_ref[0].set_data((dataTopX, dataTopY))
+            self._plot_ref[1].set_data((dataBottomX, dataBottomY))
+            self._plot_ref[2].set_data((dataLeftX, dataLeftY))
+            self._plot_ref[3].set_data((dataRightX, dataRightY))
+            '''
             self._plot_ref[0].set_ydata(dataTopY)
             self._plot_ref[0].set_xdata(dataTopX)
             self._plot_ref[1].set_ydata(dataBottomY)
@@ -283,7 +295,10 @@ class EnergyVMomentum(QWidget):
             self._plot_ref[2].set_xdata(dataLeftX)
             self._plot_ref[3].set_ydata(dataRightY)
             self._plot_ref[3].set_xdata(dataRightX)
+            #'''
         self.canvas.draw()
+        
+        
     
     #configure the graph
     def configure_graph(self):

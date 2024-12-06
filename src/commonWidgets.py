@@ -1,15 +1,18 @@
-from PyQt6.QtWidgets import QFileDialog, QMessageBox, QPushButton, QDialogButtonBox, QVBoxLayout, QGroupBox, QLineEdit, QHBoxLayout, QCheckBox
+### 2024 Alex Poulin
+from PyQt6.QtWidgets import QFileDialog, QMessageBox, QPushButton, QDialogButtonBox, QVBoxLayout, QGroupBox, QLineEdit, QHBoxLayout, QCheckBox, QSizePolicy
 from PyQt6.QtCore import QDir
 
 import numpy as np
 import os, sys
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 
 from subprocess import check_call as run 
 from getopt import getopt, GetoptError 
 
 from src.widgets.QFileDialogFlatField import QFileDialogFlatFieldWidget
+from src.widgets.plottoolbar import matplotToolbar
 
 #remaps to the energy range
 def remap(value, start1, stop1, start2, stop2):
@@ -82,6 +85,7 @@ def configure_graph_com(self, type, x, y):
     self.ax.title.set_color('white')
     self.ax.grid(True)
     #self.ax.invert_yaxis()
+    self.canvas.draw()
     
 def setup_figure_com(self):
     # a figure instance to plot on
@@ -89,6 +93,12 @@ def setup_figure_com(self):
     # this is the Canvas Widget that displays the `figure`
     # it takes the `figure` instance as a parameter to __init__
     self.canvas = FigureCanvas(self.figure)
+    # Create a Navigation Toolbar for zooming/panning
+    #self.toolbar = NavigationToolbar(self.canvas, self)
+    self.toolbar = matplotToolbar(self.canvas, self)
+        
+    # Add toolbar and canvas to the layout
+    #self.layout.addWidget(self.toolbar)
     
     widthPixels = 2080
     heightPixels = 810
@@ -99,7 +109,10 @@ def setup_figure_com(self):
 
     self.figure.patch.set_facecolor('white')
     self.figure.patch.set_alpha(0)
+    #sest tight layout
+    #self.figure.tight_layout()
     self.canvas.setStyleSheet("background-color:transparent;")
+    self.canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
     self.ax = self.figure.add_subplot(111)
     
 def reset_button_com(self):
