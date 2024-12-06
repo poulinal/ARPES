@@ -3,13 +3,13 @@ Mucho work in progress
 
 
 
-Dependancies:
-'''pip install pyqt6'''
-'''pip install pillow'''
-'''pip install matplotlib'''
-'''pip install numpy'''
-'''pip install scipy'''
-'''pip install pandas'''
+**Dependancies:**
+`pip install pyqt6
+pip install pillow
+pip install matplotlib
+pip install numpy
+pip install scipy
+pip install pandas`
 
 
 Note expected updates are shown here: 
@@ -17,8 +17,8 @@ https://unleashed-ferret-f75.notion.site/cf8bb74aa9094069be2738f1d213716c?v=52b7
 
 **To install:**
 Simply to get the most recent main update do:
-'''git clone https://github.com/poulinal/ARPES.git'''
-This will clone this repository in the current directory. At any point, make sure to '''git pull''' to make sure you have the latest updates. 
+`git clone https://github.com/poulinal/ARPES.git`
+This will clone this repository in the current directory. At any point, make sure to `git pull` to make sure you have the latest updates. 
 Currently this program will be running on 'main.py' but eventually I want to release a single executable app instead. This app will also hopefully contain the ability to 
 
 This repository is meant as an accumulation of code to assist in the data acquisition and analysis at DeLTA and NanoESCA labratories.
