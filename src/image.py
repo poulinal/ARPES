@@ -2,7 +2,7 @@
 #recipricsl dpsce #jahn-teller effect
 from PyQt6.QtWidgets import QMainWindow, QLabel, QHBoxLayout, QVBoxLayout, QWidget, QSlider
 from PyQt6.QtWidgets import QFileDialog, QGraphicsView 
-from PyQt6.QtWidgets import QLineEdit, QPushButton, QComboBox
+from PyQt6.QtWidgets import QLineEdit, QPushButton, QComboBox, QCheckBox
 from PyQt6.QtGui import QPixmap, QPainter, QPen, QColor, QIntValidator
 from PyQt6.QtCore import Qt, QDir, QPoint
 from src.tifConv import tiff_im, get_info
@@ -18,10 +18,16 @@ import matplotlib.pyplot as plt
 from src.tifConv import get_energies
 from src.saveMov import ArrayToVideo
 
+from scipy.ndimage import gaussian_filter
+
+
 class ARPESGUI(QMainWindow):
     def __init__(self):
         super().__init__()
         QGraphicsView.__init__(self, parent=None)
+        
+        self.setGeometry(100, 100, 1024, 824)  # Window size
+        #window size where the first two are the position of the window and the last two are the size of the window (width, height)
         
         #setup variables
         self.dir_path = ""  # Class variable to store the directory path
@@ -37,14 +43,19 @@ class ARPESGUI(QMainWindow):
         self.maxcontrast = 10000
         self._plot_ref = [None, None] #first is main plot, second is line
         self.iris = False
+        self.gaussian = False
 
         # Set up the main window
-        self.setWindowTitle("DeLTA Lab ARPES GUI")
+        self.setWindowTitle("ARDA - Alexander Poulin")
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
 
         layoutRow1 = QHBoxLayout()
         self.layoutCol1 = QVBoxLayout()
+        self.layoutCol1Row1 = QHBoxLayout()
+        self.layoutCol1Row2 = QHBoxLayout()
+        self.layoutCol1Row2Col1 = QVBoxLayout()
+        self.layoutCol1Row3 = QHBoxLayout()
         self.layoutCol2 = QVBoxLayout()
         self.layoutCol2Col1 = QVBoxLayout()
         self.layoutCol2Row1 = QHBoxLayout()
@@ -56,7 +67,12 @@ class ARPESGUI(QMainWindow):
         #setup the UI
         self.setup_UI()
         #finalize layout
+        self.layoutCol1.addLayout(self.layoutCol1Row1)
+        self.layoutCol1.addLayout(self.layoutCol1Row2)
+        self.layoutCol1Row2.addLayout(self.layoutCol1Row2Col1)
+        self.layoutCol1.addLayout(self.layoutCol1Row3)
         layoutRow1.addLayout(self.layoutCol1)
+        
         self.layoutCol2Col1.addLayout(self.layoutCol2Row1)
         self.layoutCol2Col1.addLayout(self.layoutCol2Row2)
         self.layoutCol2Col1.addLayout(self.layoutCol2Row3)
@@ -69,40 +85,37 @@ class ARPESGUI(QMainWindow):
 
     #setup the basic ui elements
     def setup_UI(self):
-        files = src.fileWork.files()
-        self.dir_path = files.dir_path
-        self.dat = files.dat
-        #self.energies = files.energies
-        tif = files.tif
-        self.tifArr = tiff_im(self.dir_path, tif)
-        self.iris = files.iris
-        if self.iris:
-            print(f"before: {self.tifArr[0][0]}")
-            iris_flat_tif = files.iris_flat_tif
-            self.iris_flat_arr = tiff_im(files.iris_path, iris_flat_tif)
-            print(f"iris: {self.iris_flat_arr[0][0]}")
-            self.tifArr = np.divide(self.tifArr, self.iris_flat_arr)
-            self.iris_flat_dat = files.iris_flat_dat
-            print(f"after: {self.tifArr[0][0]}")
-        
-        self.energyArr = get_energies(self.dir_path, self.dat)
+        self.setup_data()
         
         #print(self.tifArr)
         
         #Main figure
         setup_figure_com(self)
+        self.layoutCol1Row2Col1.addWidget(self.toolbar)
         self.imageBuilder = src.buildImage.ImageBuilder()
-        self.imageBuilder.build_image(self, 0)
+        self.imageBuilder.build_image(self, self.tifArr[0])
         self.ax.axis('off')  # Turn off axes
         self.ax.autoscale(False)
-        self.layoutCol1.addWidget(self.canvas)
+        #self.figure.tight_layout()
+        
+        self.layoutCol1Row2Col1.addWidget(self.canvas)
         #print(plt.colormaps())
         
+        #setup file button
+        self.files = src.fileWork.files()
+        self.layoutCol1Row1.addWidget(self.files)
+        self.files.update_dir.connect(self.get_dir_data)
+        self.files.update_flatfield_dir.connect(self.get_flatfield_data)
+        
         #add slider to slide through images
-        slider = QSlider(Qt.Orientation.Horizontal) #create new horizontal slider
-        slider.setRange(0, len(tif) - 1)  # Set the range of the slider to the number of images
-        slider.valueChanged.connect(self.slider_value_changed) #on change, call slider_value_changed
-        self.layoutCol1.addWidget(slider, stretch=1)  # Add the slider to the layout with stretch=1 to make it take full width
+        self.slider = QSlider(Qt.Orientation.Horizontal) #create new horizontal slider
+        if len(self.tif) <= 1:
+            self.slider.setRange(0, 100)
+            self.slider.setDisabled(True)
+        else:
+            self.slider.setRange(0, len(self.tif) - 1)  # Set the range of the slider to the number of images
+        self.slider.valueChanged.connect(self.slider_value_changed) #on change, call slider_value_changed
+        self.layoutCol1Row3.addWidget(self.slider, stretch=1)  # Add the slider to the layout with stretch=1 to make it take full width
         
         #setup submit button
         submitButton = QPushButton("Submit")
@@ -118,6 +131,11 @@ class ARPESGUI(QMainWindow):
         self.setupCurEnergy(0)
         self.layoutCol2Row1.addWidget(self.info)
         self.layoutCol2Row2.addWidget(self.currentEnergy)
+        
+        #gaussian toggle checkbox
+        self.gaussianToggle = QCheckBox("Apply Gaussian Filter")
+        self.gaussianToggle.stateChanged.connect(self.toggleGaussian)
+        self.layoutCol2Row2.addWidget(self.gaussianToggle)
         
         
         #setup lineCoords
@@ -202,6 +220,61 @@ class ARPESGUI(QMainWindow):
         #setup resetbutton
         reset_button_com(self)
         self.layoutCol2Row6.addWidget(self.resetButton)
+        
+    def setup_data(self):
+        self.tifArr = np.zeros((50, 1024, 1024))
+        self.dat = ""
+        self.tif = ["dummy data"]
+        self.energyArr = np.arange(0, 5, 0.1)
+        
+        
+    def get_dir_data(self):
+        self.files.get_folder()
+        self.dir_path = self.files.dir_path
+        self.dat = self.files.dat
+        print(f"dir_path: {self.dir_path}")
+        #self.energies = files.energies
+        self.tif = self.files.tif
+        self.tifArr = tiff_im(self.dir_path, self.tif)
+        #self.tifArr = plt.tonemap(self.tifArr)
+        
+        if self.dat != "":
+            self.energyArr = get_energies(self.dir_path, self.dat)
+        
+        self.imageBuilder.build_image(self, self.getImage())
+        self.slider.setEnabled(True)
+        self.slider.setRange(0, len(self.tif) - 1)
+        self.info.setText(self.get_info())
+    
+        
+    def get_flatfield_data(self):
+        self.files.get_folder()
+        flatfield = self.files.flatfield_path
+        if flatfield is not None:
+            #print("doing flat field correction now")
+            #print(f"before: {self.tifArr[0][0]}")
+            flatfield_tif = self.files.flatfield_tif
+            #print(f"flatfield from class: {self.files.flatfield_tif}")
+            #print(f"flatfield: {flatfield_tif}")
+            #print(f"flatfield path: {self.files.flatfield_path}")
+            self.flatfield_arr = tiff_im(self.files.flatfield_path, flatfield_tif)
+            #print(f"iris: {self.iris_flat_arr[0][0]}")
+            #print(f"before: {self.tifArr}")
+            if len(self.tifArr) != len(self.flatfield_arr):
+                ff_index = 0
+                for i in range(len(self.tifArr)):
+                    if ff_index >= len(self.flatfield_arr):
+                        ff_index = 0
+                    self.tifArr[i] = np.divide(self.tifArr[i], self.flatfield_arr[ff_index])
+                    ff_index += 1
+            else:
+                self.tifArr = np.divide(self.tifArr, self.flatfield_arr)
+            #print(f"after: {self.tifArr}")
+            #self.flatfield_dat = files.flatfield_dat
+            #print(f"after: {self.tifArr[0][0]}")
+            self.imageBuilder.build_image(self, self.getImage())
+    
+    
     
     #resets the line
     def reset_line(self):
@@ -209,17 +282,24 @@ class ARPESGUI(QMainWindow):
         self.textLineY.setText("")
         self.textLineFinalX.setText("")
         self.textLineFinalY.setText("")
+        
+        
+        self.lastx = None
+        self.lasty = None
+        self.startx = None
+        self.starty = None
+        
+        
         #self.image_label.setPixmap(QPixmap.fromImage(ImageQt.ImageQt(self.im)))
         self.resetButton.setStyleSheet("color : rgba(0, 0, 0, 0); background-color : rgba(0, 0, 0, 0); border : 0px solid rgba(0, 0, 0, 0);")
         self.resetButton.hide()
         
-        self.ax.cla()
-        self._plot_ref[1] = None
-        self.imageBuilder.build_image(self, self.lastIm)
-        self.ax.axis('off')  # Turn off axes
+        #self.ax.cla()
         #self._plot_ref[1] = None
-        #self.canvas.draw()
-        #self.update()
+        self._plot_ref[1].set_xdata(0)
+        self._plot_ref[1].set_ydata(0)
+        ############ note this is just a bandaid fix, not really good practice ###############3
+        self.canvas.draw()
         
     def change_colormap(self, text):
         self._plot_ref[0].set_cmap(text)
@@ -227,6 +307,8 @@ class ARPESGUI(QMainWindow):
         
     #get infohead
     def get_info(self):
+        if self.dir_path == "":
+            return "No data loaded"
         infoHead = get_info(self.dir_path, self.dat)
         #print(f"infoHead: \n {infoHead}, \n {type(infoHead)}")
         #FILE_ID, EXPERIMENT_NAME, MEASUREMENT_NAME, TIMESTAMP, INSTITUTION, SAMPLE
@@ -238,11 +320,21 @@ class ARPESGUI(QMainWindow):
     
     def setupCurEnergy(self, num):
         self.currentEnergy.setText(f"Current Energy Level: {self.energyArr[num]}")
+        
+    def toggleGaussian(self):
+        self.gaussian = not self.gaussian
+        self.imageBuilder.build_image(self, self.getImage())
+    
+    def getImage(self):
+        if self.gaussian:
+            return gaussian_filter(self.tifArr[self.lastIm], sigma = 1.5)
+        else:
+            return self.tifArr[self.lastIm]
 
     #(will updates the images) according to the slider value
     def slider_value_changed(self, i):
         self.lastIm = i
-        self.imageBuilder.build_image(self, self.lastIm)
+        self.imageBuilder.build_image(self, self.getImage())
         self.setupCurEnergy(i)
         '''
         if (self.lastx is not None and self.lasty is not None):
@@ -257,7 +349,7 @@ class ARPESGUI(QMainWindow):
         self.label_right.setText(f"Right: {self.vmax:.2f}")
         #self.slider_right.setMinimum(value)
         #self._plot_ref[0].set_clim(vmin=self.vmin)
-        self.imageBuilder.build_image(self, self.lastIm)
+        self.imageBuilder.build_image(self, self.getImage())
         #self.update()
     
     def update_maxcontrast(self):
@@ -337,7 +429,7 @@ class ARPESGUI(QMainWindow):
         
         #here start means where xintercept is, and final means where the line would intersect with the upperbound of the box (i.e. the right side for x)
         xfinal = np.poly1d(fy)(xlim[1])
-        yfinal = np.poly1d(fx)(ylim[0])
+        yfinal = np.poly1d(fx)(ylim[0]) 
         xstart = np.poly1d(fy)(xlim[0])
         ystart = np.poly1d(fx)(ylim[1])
         
@@ -345,7 +437,7 @@ class ARPESGUI(QMainWindow):
         ystart = np.clip(ystart, ylim[1], ylim[0])
         xfinal = np.clip(xfinal, xlim[0], xlim[1])
         yfinal = np.clip(yfinal, ylim[1], ylim[0])
-        
+
         if (min(xstart, xfinal) == xlim[0] and max(xstart, xfinal) == xlim[1]):
             #horizontal
             distance = np.sqrt((xlim[0] - xlim[1])**2 + (ystart - yfinal)**2)
@@ -390,6 +482,8 @@ class ARPESGUI(QMainWindow):
         
     #interpolate the line to go across the image
     def interpl(self): 
+        if (self.lastx is None or self.lasty is None or self.startx is None or self.starty is None):
+            return
         posExt, distance = self.extend_line((self.lastx, self.lasty))
         #print(f"posExt: {posExt}")
         if (posExt[0] is None or posExt[1] is None):
@@ -399,11 +493,74 @@ class ARPESGUI(QMainWindow):
         
         #only return those points in the array which align with x_new and y_new
         #result = np.zeros(shape = (len(posExt[0]), len(posExt[1]))) #this will eventually be converted to image so should be height by width (height is number of images, width is distance of selection)
-        result = np.zeros(shape = (int(len(self.tifArr)), int(distance)))
+        #result = np.zeros(shape = (int(len(self.tifArr)), int(distance)))
+        result = np.zeros(shape = (int(len(self.tifArr)), self.tifArr[0].shape[0])) #note shape is row, col
         imIndex = 0
+        print(f"posExt: {posExt}")
         for tiffIm in self.tifArr:
-            for i in range(result.shape[1]):
-                dataPoint = tiffIm[int(posExt[0][i])][int(posExt[1][i])]
+            for i in range(result.shape[1] - 1):
+                #data point on the exact point (note posExt[0] is x coordinates along line, posExt[1] is y coordinates along line)
+                nearestXPix = int(posExt[0][i])
+                nearestYPix = int(posExt[1][i])
+                
+                #gamma = self.distanceWeightedAverage(nearestXPix, nearestYPix, posExt[0], posExt[1], 2)
+                #dataPoint = gamma * tiffIm[nearestXPix][nearestYPix]
+                
+                dataPoint = tiffIm[nearestXPix][nearestYPix]
+                #dataPoint = self.distanceWeightedAverage(nearestXPix, nearestYPix, posExt[0][i], posExt[1][i], 2) * tiffIm[nearestXPix][nearestYPix]
+                
+                #posExt[0][i] gets the xpoint on that iteration
+                
+                cluster_data = 1 #amount of points we cluster --for average later
+                #if (posExt[0][i] < 0 or posExt[0][i] >= 1024 or posExt[1][i] < 0 or posExt[1][i] >= 1024):
+                #dataPoint += tiff_im[int(posExt[0][i])][int(posExt[1][i])]
+                
+                
+                if (nearestXPix > 0): #can go to left for cluster
+                    dataPoint += tiffIm[nearestXPix - 1][nearestYPix]
+                    #dataPoint += self.distanceWeightedAverage(nearestXPix - 1, nearestYPix, posExt[0][i], posExt[1][i], 2) * tiffIm[nearestXPix - 1][nearestYPix]
+                    cluster_data += 1
+                    
+                    #diagonal left up and down
+                    if (nearestXPix > 0): #can go to up for cluster
+                        dataPoint += tiffIm[nearestXPix - 1][nearestYPix - 1]
+                        cluster_data += 1
+                        #dataPoint += self.distanceWeightedAverage(nearestXPix - 1, nearestYPix - 1, posExt[0][i], posExt[1][i], 2) * tiffIm[nearestXPix - 1][nearestYPix - 1]
+                    if (nearestXPix < self.tifArr[0].shape[0] - 1): #can go to down for cluster
+                        dataPoint += tiffIm[nearestXPix - 1][nearestYPix + 1]
+                        cluster_data += 1
+                        #dataPoint += self.distanceWeightedAverage(nearestXPix - 1, nearestYPix + 1, posExt[0][i], posExt[1][i], 2) * tiffIm[nearestXPix - 1][nearestYPix + 1]
+                    
+                if (nearestXPix < self.tifArr[0].shape[1] - 1): #can go to right for cluster
+                    dataPoint += tiffIm[nearestXPix + 1][nearestYPix]
+                    cluster_data += 1
+                    #dataPoint += self.distanceWeightedAverage(nearestXPix + 1, nearestYPix, posExt[0][i], posExt[1][i], 2) * tiffIm[nearestXPix + 1][nearestYPix]
+                    
+                    #diagonal right up and down
+                    if (nearestXPix > 0): #can go to up for cluster
+                        dataPoint += tiffIm[nearestXPix + 1][nearestYPix - 1]
+                        cluster_data += 1
+                        #dataPoint += self.distanceWeightedAverage(nearestXPix + 1, nearestYPix - 1, posExt[0][i], posExt[1][i], 2) * tiffIm[nearestXPix + 1][nearestYPix - 1]
+                    if (nearestYPix < self.tifArr[0].shape[0] - 1): #can go to down for cluster
+                        dataPoint += tiffIm[nearestXPix + 1][nearestYPix + 1]
+                        cluster_data += 1
+                        #dataPoint += self.distanceWeightedAverage(nearestXPix + 1, nearestYPix + 1, posExt[0][i], posExt[1][i], 2) * tiffIm[nearestXPix + 1][nearestYPix + 1]
+                    
+                if (nearestYPix > 0): #can go to up for cluster
+                    dataPoint += tiffIm[nearestXPix][nearestYPix - 1]
+                    cluster_data += 1
+                    #dataPoint += self.distanceWeightedAverage(nearestXPix, nearestYPix - 1, posExt[0][i], posExt[1][i], 2) * tiffIm[nearestXPix][nearestYPix - 1]
+                
+                if (nearestYPix < self.tifArr[0].shape[0] - 1): #can go to down for cluster
+                    dataPoint += tiffIm[nearestXPix][nearestYPix + 1]
+                    cluster_data += 1
+                    #dataPoint += self.distanceWeightedAverage(nearestXPix, nearestYPix + 1, posExt[0][i], posExt[1][i], 2) * tiffIm[nearestXPix][nearestYPix + 1]
+                    
+                if cluster_data > 1:
+                    dataPoint = dataPoint / cluster_data
+                
+                
+                
                 if self.vmin is not None and self.vmax is not None:
                     #print(f"datapoint: {dataPoint}")
                     #dataPoint = (dataPoint - self.vmin) / (self.vmax - self.vmin)
@@ -411,13 +568,23 @@ class ARPESGUI(QMainWindow):
                     #print(f"new datapoint: {dataPoint}")
                 result[imIndex][i] = dataPoint
             imIndex += 1
+            
         result = result.astype(float)
         #print(result)
-        
         result = np.flip(result, axis=0)
-        
         self.show_new_image(result)
         return
+    
+    
+    def distanceWeightedAverage(self, x, y, x_new, y_new, p):
+        ### p is the power of the distance
+        ### x and y are the coordinates of the point we are trying to find the value of
+        ### x_new and y_new are the coordinates of the point we are trying to find the value of
+        ### returns the weighted average of the point
+        gamma = 0
+        for i in range(len(x_new)):
+            gamma += (1 / (np.sqrt((x_new[i] - x)**2 + (y_new[i] - y)**2))**p)
+        return gamma
     
     def show_new_image(self, result):
         self.w = EnergyVMomentum(result, self.dir_path, self.tifArr, self.dat)
@@ -427,5 +594,6 @@ class ARPESGUI(QMainWindow):
     #save the file
     def save_file(self):
         ArrayToVideo(self.tifArr, self.vmin, self.vmax, self)
+        
         
         

@@ -1,6 +1,6 @@
 ### 2024 Alex Poulin
 from PyQt6.QtWidgets import QLabel, QHBoxLayout, QVBoxLayout, QWidget
-from PyQt6.QtWidgets import QGraphicsView, QPushButton, QLineEdit
+from PyQt6.QtWidgets import QGraphicsView, QPushButton, QLineEdit, QCheckBox
 import numpy as np
 
 from src.distributionCurve import DistCrve
@@ -11,10 +11,9 @@ from src.widgets.colorramp import ColorRampWidget
 
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-"""
-This "window" is a QWidget. If it has no parent, it
-will appear as a free-floating window as we want.
-"""
+
+from scipy.ndimage import gaussian_filter
+
 class EnergyVMomentum(QWidget):
     def __init__(self, results, path, tifArr, dat):
         super().__init__()
@@ -36,18 +35,20 @@ class EnergyVMomentum(QWidget):
         #self.info = info
         self.energiesLow = None
         self.energiesHigh = None
+        self.gaussian = False #duplicate code, eventually want to consolidate
         
         self.maxcontrast = 10000
         self.vmin = None
         self.vmax = None
-        self._plot_ref = [None, None]
+        #self._plot_ref = [None, None]
         
         # We need to store a reference to the plotted line
         # somewhere, so we can apply the new data to it.
         self._plot_ref = [None, None, None, None]
+        print(f"self._plot_ref: {self._plot_ref}")
         
         #setup window
-        self.setWindowTitle("Energy vs Momentum Plot")
+        self.setWindowTitle("Energy vs Momentum Plot - Alexander Poulin")
         self.mainWindow = QVBoxLayout()
         self.layoutRow1 = QHBoxLayout()
         self.layoutCol1 = QVBoxLayout()
@@ -79,8 +80,14 @@ class EnergyVMomentum(QWidget):
         self.intYButton.clicked.connect(self.integrate)
         self.save_button.clicked.connect(self.save_file)
         
+        #gaussian toggle checkbox
+        self.gaussianToggle = QCheckBox("Apply Gaussian Filter")
+        self.gaussianToggle.stateChanged.connect(self.toggleGaussian)
+        self.layoutCol1.addWidget(self.gaussianToggle)
+        
         #setupFigure
         setup_figure_com(self)
+        #self.layoutCol2.addWidget(self.toolbar)
         
         # Connect the mouse events
         self.canvas.mpl_connect('button_press_event', self.plot_mouse_click)
@@ -137,6 +144,16 @@ class EnergyVMomentum(QWidget):
         self.resetButton.setStyleSheet("color : rgba(0, 0, 0, 0); background-color : rgba(0, 0, 0, 0); border : 0px solid rgba(0, 0, 0, 0);")
         #self.resetButton.hide()
         #self.update()
+        
+    def toggleGaussian(self):
+        self.gaussian = not self.gaussian
+        self.build_EM()
+    
+    def getImage(self):
+        if self.gaussian:
+            return gaussian_filter(self.result, sigma = 1.5)
+        else:
+            return self.result
         
     #start point on click
     def plot_mouse_click(self, e):
@@ -196,7 +213,7 @@ class EnergyVMomentum(QWidget):
             #print("new")
             new_vmin = np.min(self.result)
             new_vmax = np.max(self.result)
-            plot_refs = self.ax.imshow(self.result, cmap='gray',extent=[0, self.result.shape[1],
+            plot_refs = self.ax.imshow(self.getImage(), cmap='gray',extent=[0, self.result.shape[1],
                                                                 self.energiesLow, self.energiesHigh], vmin = new_vmin, vmax = new_vmax)
             #print(plot_refs)
             self._plot_ref[0] = plot_refs
@@ -204,7 +221,7 @@ class EnergyVMomentum(QWidget):
             #print("override")
             #plot_refs = self.ax.imshow(self.tifArr[im], cmap='gray', vmin = self.vmin, vmax = self.vmax)
             #print(self.tifArr[im])
-            self._plot_ref[0].set_data(self.result)
+            self._plot_ref[0].set_data(self.getImage())
         if (self.vmax is not None and self.vmin is not None):
             self._plot_ref[0].set_clim(vmin=self.vmin, vmax=self.vmax)
         elif (self.vmin is not None):
@@ -244,9 +261,11 @@ class EnergyVMomentum(QWidget):
         self.buildEM() 
         #this is clear and redrawing -- very laggy
         '''
+        
+        #print(f"self._plot_ref: {self._plot_ref[0]}")
         # Note: With this reference below, we no longer need to clear the axis.
         #Note: this takes more to store the references, but it is faster
-        if self._plot_ref[0] is None:
+        if self._plot_ref[0] is None or self._plot_ref[1] is None or self._plot_ref[2] is None or self._plot_ref[3] is None:
             # First time we have no plot reference, so do a normal plot.
             # .plot returns a list of line <reference>s, as we're
             # only getting one we can take the first element.
@@ -258,8 +277,16 @@ class EnergyVMomentum(QWidget):
             self._plot_ref[2] = plot_refs[0]
             plot_refs = self.ax.plot(dataRightX, dataRightY, '-', color='yellow')
             self._plot_ref[3] = plot_refs[0]
+            #print(f"dataTopX: {dataTopX}, dataTopY: {dataTopY}, dataBottomX: {dataBottomX}, dataBottomY: {dataBottomY}, dataLeftX: {dataLeftX}, dataLeftY: {dataLeftY}, dataRightX: {dataRightX}, dataRightY: {dataRightY}")
+            #print(type(self._plot_ref[0]))
         else:
             # We have a reference, we can use it to update the data for that line.
+            '''
+            self._plot_ref[0].set_data((dataTopX, dataTopY))
+            self._plot_ref[1].set_data((dataBottomX, dataBottomY))
+            self._plot_ref[2].set_data((dataLeftX, dataLeftY))
+            self._plot_ref[3].set_data((dataRightX, dataRightY))
+            '''
             self._plot_ref[0].set_ydata(dataTopY)
             self._plot_ref[0].set_xdata(dataTopX)
             self._plot_ref[1].set_ydata(dataBottomY)
@@ -268,7 +295,10 @@ class EnergyVMomentum(QWidget):
             self._plot_ref[2].set_xdata(dataLeftX)
             self._plot_ref[3].set_ydata(dataRightY)
             self._plot_ref[3].set_xdata(dataRightX)
+            #'''
         self.canvas.draw()
+        
+        
     
     #configure the graph
     def configure_graph(self):

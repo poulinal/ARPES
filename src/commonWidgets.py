@@ -1,11 +1,18 @@
-from PyQt6.QtWidgets import QFileDialog, QMessageBox, QPushButton
+### 2024 Alex Poulin
+from PyQt6.QtWidgets import QFileDialog, QMessageBox, QPushButton, QDialogButtonBox, QVBoxLayout, QGroupBox, QLineEdit, QHBoxLayout, QCheckBox, QSizePolicy
 from PyQt6.QtCore import QDir
 
 import numpy as np
 import os, sys
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 
+from subprocess import check_call as run 
+from getopt import getopt, GetoptError 
+
+from src.widgets.QFileDialogFlatField import QFileDialogFlatFieldWidget
+from src.widgets.plottoolbar import matplotToolbar
 
 #remaps to the energy range
 def remap(value, start1, stop1, start2, stop2):
@@ -78,6 +85,7 @@ def configure_graph_com(self, type, x, y):
     self.ax.title.set_color('white')
     self.ax.grid(True)
     #self.ax.invert_yaxis()
+    self.canvas.draw()
     
 def setup_figure_com(self):
     # a figure instance to plot on
@@ -85,6 +93,12 @@ def setup_figure_com(self):
     # this is the Canvas Widget that displays the `figure`
     # it takes the `figure` instance as a parameter to __init__
     self.canvas = FigureCanvas(self.figure)
+    # Create a Navigation Toolbar for zooming/panning
+    #self.toolbar = NavigationToolbar(self.canvas, self)
+    self.toolbar = matplotToolbar(self.canvas, self)
+        
+    # Add toolbar and canvas to the layout
+    #self.layout.addWidget(self.toolbar)
     
     widthPixels = 2080
     heightPixels = 810
@@ -95,7 +109,10 @@ def setup_figure_com(self):
 
     self.figure.patch.set_facecolor('white')
     self.figure.patch.set_alpha(0)
+    #sest tight layout
+    #self.figure.tight_layout()
     self.canvas.setStyleSheet("background-color:transparent;")
+    self.canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
     self.ax = self.figure.add_subplot(111)
     
 def reset_button_com(self):
@@ -106,12 +123,48 @@ def reset_button_com(self):
     #self.resetButton.hide()
     self.resetButton.setStyleSheet("color : rgba(0, 0, 0, 0); background-color : rgba(0, 0, 0, 0); border : 0px solid rgba(0, 0, 0, 0);")
 
-#returns the path of the folder selected by the user
-def get_folder(self):
-    #print("Get folder")
-    dir_path = QFileDialog.getExistingDirectory(
-        #parent=self,
-        caption="Select directory",
-        directory=QDir().homePath(),
-        options=QFileDialog.Option.DontUseNativeDialog)
-    return dir_path
+
+
+
+RELEASE = 'master' # default release 
+SRC_DIR = "$HOME/.src" # checkout directory 
+UPDATE_CMD = ( # base command 
+'pip install --src="%s" --upgrade -e ' 
+'git://github.com/poulinal/ARPES.git@%s#egg=ARPES' 
+)
+#@command 
+def update(args): 
+    try: 
+        opts, args = getopt(args, 'sr:', ['sudo', 'src=', 'release=', 'commit=']) 
+    except GetoptError as err: 
+        #log(err) 
+        print(err)
+        #usage(error_codes['option'])
+
+    sudo = False 
+    src_dir = SRC_DIR 
+    release = RELEASE 
+    commit = None 
+    for opt, arg in opts: 
+        if opt in ('-s', '--sudo'): 
+            sudo = True 
+        elif opt in ('-r', '--release'): 
+            release = arg 
+        elif opt in ('--src',): 
+            src_dir = arg 
+        elif opt in ('--commit',): 
+            commit = arg
+
+    if release[0].isdigit(): ## Check if it is a version 
+        release = 'r' + release 
+    release = 'origin/' + release ## assume it is a branch
+
+    if commit is not None: ## if a commit is supplied use that 
+        cmd = UPDATE_CMD % (src_dir, commit) 
+    else: 
+        cmd = UPDATE_CMD % (src_dir, release)
+
+    if sudo: 
+        run('sudo %s' % cmd) 
+    else: 
+        run(cmd)
