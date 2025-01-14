@@ -27,7 +27,7 @@ class HOMEGUI(QMainWindow):
 
         # Create left button with image
         arpesButton = QPushButton()
-        arpesButton.setIcon(QIcon('ARPES/src/images/arpesDemo.png'))  # Set left picture
+        arpesButton.setIcon(QIcon('src/images/arpesDemo.png'))  # Set left picture #assume in ARPES directory
         #print(arpesButton.sizeHint())
         arpesButton.clicked.connect(self.arpes_button_clicked)  # Connect click signal
         #arpesButton.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
@@ -39,7 +39,7 @@ class HOMEGUI(QMainWindow):
 
         # Create right button with image
         xpsButton = QPushButton()
-        xpsButton.setIcon(QIcon('ARPES/src/images/xpsDemo.png'))  # Set right picture
+        xpsButton.setIcon(QIcon('src/images/xpsDemo.png'))  # Set right picture
         xpsButton.clicked.connect(self.xps_button_clicked)  # Connect click signal
         layout.addWidget(xpsButton, 0, 1, 3, 1)
         xpsButton.setIconSize(xpsButton.size())  # Set icon size to button size
