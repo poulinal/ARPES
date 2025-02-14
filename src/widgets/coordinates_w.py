@@ -1,3 +1,4 @@
+### 2024 Alex Poulin
 from PyQt6.QtWidgets import QWidget
 
 class coord_w(QWidget):

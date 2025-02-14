@@ -1,3 +1,4 @@
+### 2024 Alex Poulin
 import sys
 from PyQt6.QtCore import Qt, QRectF, QPointF, pyqtSignal
 from PyQt6.QtGui import QPainter, QColor, QLinearGradient, QMouseEvent

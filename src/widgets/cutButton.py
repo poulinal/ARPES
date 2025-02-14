@@ -1,3 +1,4 @@
+### 2024 Alex Poulin
 from PyQt6.QtWidgets import QPushButton
 from PyQt6.QtGui import QPainter, QPen, QColor
 from PyQt6.QtCore import QSize

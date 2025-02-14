@@ -1,5 +1,4 @@
 ### 2024 Alex Poulin
-#recipricsl dpsce #jahn-teller effect
 from PyQt6.QtWidgets import QMainWindow, QLabel, QHBoxLayout, QVBoxLayout, QWidget, QSlider
 from PyQt6.QtWidgets import QFileDialog, QGraphicsView 
 from PyQt6.QtWidgets import QLineEdit, QPushButton, QComboBox, QCheckBox
