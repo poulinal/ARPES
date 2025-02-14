@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QHBoxLayout, QVB
 from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtCore import QSize
 
-from src.image import ARPESGUI
+from src.arpesHome import ARPESGUI
 from src.xps import XPSGUI
 
 import os

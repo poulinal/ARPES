@@ -4,7 +4,7 @@ import sys
 from PyQt6.QtWidgets import QApplication
 
 from src.homePage import HOMEGUI
-from src.image import ARPESGUI
+from src.arpesHome import ARPESGUI
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
