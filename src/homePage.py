@@ -2,12 +2,19 @@ from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QHBoxLayout, QVB
 from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtCore import QSize
 
-from src.image import ARPESGUI
+from src.arpesHome import ARPESGUI
 from src.xps import XPSGUI
+
+import os
 
 class HOMEGUI(QMainWindow):
     def __init__(self):
         super().__init__()
+        
+        #''' 
+        print("File location using os.getcwd():",  
+            os.getcwd()) 
+        #'''
 
         # Set window title
         self.setWindowTitle("DeLTA Home Page")
@@ -20,7 +27,7 @@ class HOMEGUI(QMainWindow):
 
         # Create left button with image
         arpesButton = QPushButton()
-        arpesButton.setIcon(QIcon('/Users/alexpoulin/Downloads/git/ARPES/src/images/arpesDemo.png'))  # Set left picture
+        arpesButton.setIcon(QIcon('src/images/arpesDemo.png'))  # Set left picture #assume in ARPES directory
         #print(arpesButton.sizeHint())
         arpesButton.clicked.connect(self.arpes_button_clicked)  # Connect click signal
         #arpesButton.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
@@ -32,7 +39,7 @@ class HOMEGUI(QMainWindow):
 
         # Create right button with image
         xpsButton = QPushButton()
-        xpsButton.setIcon(QIcon('/Users/alexpoulin/Downloads/git/ARPES/src/images/xpsDemo.png'))  # Set right picture
+        xpsButton.setIcon(QIcon('src/images/xpsDemo.png'))  # Set right picture
         xpsButton.clicked.connect(self.xps_button_clicked)  # Connect click signal
         layout.addWidget(xpsButton, 0, 1, 3, 1)
         xpsButton.setIconSize(xpsButton.size())  # Set icon size to button size
