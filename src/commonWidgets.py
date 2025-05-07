@@ -125,7 +125,7 @@ def reset_button_com(self):
 
 
 
-
+##lowkey who knows if this update features works
 RELEASE = 'master' # default release 
 SRC_DIR = "$HOME/.src" # checkout directory 
 UPDATE_CMD = ( # base command 

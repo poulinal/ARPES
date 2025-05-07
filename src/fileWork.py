@@ -5,7 +5,7 @@ from PyQt6.QtCore import QDir, pyqtSignal
 
 from src.widgets.getfileordir import getOpenFilesAndDirs
 
-class files(QWidget):
+class filesWidget(QWidget):
     
     update_dir = pyqtSignal(str)
     update_flatfield_dir = pyqtSignal(str)
@@ -86,23 +86,7 @@ class files(QWidget):
         if not os.path.exists(self.dir_path):
             print("not a valid directory")
             sys.exit()
-            #'''
-        #while testing:
-        #self.dir_path = '/Users/alexpoulin/Downloads/git/ARPES/exData/Sum'
-        #self.dir_path = '/Users/alexpoulin/Downloads/git/ARPES/Data from EQUAL/XPS data/Sum' #XPS data
-        
-        #june 24 2024
-        #self.dir_path = '/Users/alexpoulin/Library/CloudStorage/OneDrive-NortheasternUniversity/DeLTA Lab/data/06.24.2024/ARPES_MnTe_Ekin_sweep_240624_145559/APES_MnTe_Direct_FOV41p8_PE25_S1p0_240624_145559/Sum'
-        #self.iris_path = '/Users/alexpoulin/Library/CloudStorage/OneDrive-NortheasternUniversity/DeLTA Lab/data/06.24.2024/ARPES_MnTe_Ekin_sweep_240624_145559/APES_MnTe_Direct_FOV41p8_PE25_S1p0_defocus_240625_010121/Sum'
-
-        #june 20 2024
-        #self.dir_path = '/Users/alexpoulin/Library/CloudStorage/OneDrive-NortheasternUniversity/DeLTA Lab/data/06.20.2024/ARPES_MnTe_Direct_Ekinsweep_240620_151626/ARPES_MnTe_Direct_FOV4p0_240620_151626/Sum'
-        #self.iris_path = '/Users/alexpoulin/Library/CloudStorage/OneDrive-NortheasternUniversity/DeLTA Lab/data/06.20.2024/ARPES_MnTe_Direct_FOV4p0_flatfield_240621_120221/Sum'
-
-        #june 18 2024
-        #self.dir_path = '/Users/alexpoulin/Library/CloudStorage/OneDrive-NortheasternUniversity/DeLTA Lab/data/ARPES data 18th June24/ARPES_MnTe_Direct_with_large_blisters_Ekinsweep_240618_122202/ARPES_MnTe_Direct_FOV4p0_Iris_with large blisters_240618_122202/Sum'
-        #self.iris_path = '/Users/alexpoulin/Library/CloudStorage/OneDrive-NortheasternUniversity/DeLTA Lab/data/ARPES data 18th June24/ARPES_MnTe_Direct_Ekinsweep_240618_111423/ARPES_MnTe_Direct_FOV4p0_Iris_without large blisters_240618_111424/Sum'
-        
+            
         #get data from directory
         self.tif = []
         self.dat = ""
@@ -153,7 +137,7 @@ class MainWindow(QWidget):
         super().__init__()
         self.setWindowTitle('File Manager')
         
-        self.file_widget = files()
+        self.file_widget = filesWidget()
 
         layout = QVBoxLayout()
         layout.addWidget(self.file_widget)
