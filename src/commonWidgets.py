@@ -28,7 +28,7 @@ def rescale(original_array, new_min, new_max):
     resized_array = np.interp(original_array, (original_array.min(), original_array.max()), (new_min, new_max))
 
     # Print the resized array
-    print(resized_array)
+    # print(resized_array)
     return resized_array
 
 def save_button_com(self, text):
@@ -42,11 +42,11 @@ def save_file_com(self, text):
     file_name, _ = QFileDialog.getSaveFileName(self,"Save File","","Text Files(*.txt)")#,options = options)
     if file_name:
         f = open(file_name, 'w')
-        np.set_printoptions(threshold=np.inf)
+        # np.set_printoptions(threshold=np.inf)
         f.write(np.array_str(text))
         self.setWindowTitle(str(os.path.basename(file_name)) + " - ARPES Analysis")
         f.close()
-        np.set_printoptions()#revert todefautl
+        # np.set_printoptions()#revert todefautl
         return True
     else:
         return self.error_dialogue("Error", "File not saved")

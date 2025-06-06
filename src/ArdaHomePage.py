@@ -4,6 +4,7 @@ from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import QSize
 
 from src.arpesHome import ARPESHome
+from src.arpesMainWindow import ARPESMainWindow
 from src.xps import XPSGUI
 
 import os
@@ -13,7 +14,7 @@ import os
 
 
 class HOMEGUI(QMainWindow):
-    def __init__(self):
+    def __init__(self, main_dir):
         super().__init__()
         
         # Set window title
@@ -43,13 +44,14 @@ class HOMEGUI(QMainWindow):
         self.central_widget.setLayout(layout)
 
     def arpes_button_clicked(self):
-        print("Left button clicked")
-        self.w = ARPESHome()
+        # print("Left button clicked")
+        # self.w = ARPESHome()
+        self.w = ARPESMainWindow()
         self.w.show()
         self.close()
 
     def xps_button_clicked(self):
-        print("Right button clicked")
+        # print("Right button clicked")
         self.w = XPSGUI()
         self.w.show()
         self.close()

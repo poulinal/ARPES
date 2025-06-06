@@ -2,8 +2,8 @@
 from PyQt6.QtWidgets import QMainWindow, QLabel, QHBoxLayout, QVBoxLayout, QWidget, QSlider
 from PyQt6.QtWidgets import QFileDialog, QGraphicsView 
 from PyQt6.QtWidgets import QLineEdit, QPushButton, QComboBox, QCheckBox
-from PyQt6.QtCore import Qt, QDir, QPoint
-from src.tifConv import tiff_im, get_info
+from PyQt6.QtCore import Qt, QDir, QPoint, pyqtSignal
+# from src.tifConv import tiff_im, get_info, get_energies
 from src.energyVmomentum import EnergyVMomentum
 import numpy as np
 
@@ -14,37 +14,36 @@ from src.saveMov import ArrayToVideo
 from src.widgets.arpesGraph import arpesGraph
 from src.arpesData import arpesData
 from src.fileWork import filesWidget
+
 from src.widgets.lineCoordsWidget import lineCoordsWidget
+from src.widgets.sliderWidget import EnergySliderWidget
+from src.widgets.resetButtonWidget import ResetButton
+from src.widgets.saveWidget import saveWidget
 
-from scipy.ndimage import gaussian_filter
+np.set_printoptions(precision=4, suppress=True, threshold=5, linewidth=120)
 
 
-class ARPESHome(QMainWindow):
+###Todo note that current i have duplicate tif/energy arrays in both filework and arpesdata... try to consolidate one way or the other... probabl consoldate data from filework into only arpesdata
+
+class ARPESHome(QWidget):
+    openEVM = pyqtSignal(object, object, object)  # Signal to open EVM with the result data
+    #resultEVMData, energiesArr, tifArr
+    
     def __init__(self):
         super().__init__()
         QGraphicsView.__init__(self, parent=None)
         
-        self.setGeometry(100, 100, 1024, 824)  # Window size
+        # self.setGeometry(100, 100, 1024, 824)  # Window size
         #window size where the first two are the position of the window and the last two are the size of the window (width, height)
         
         #setup variables
-        self.dir_path = ""  # Class variable to store the directory path
-        self.tifArr = []  # Class variable to store the tiff images as an array
-        self.startx = None
-        self.starty = None
-        self.lastx = None
-        self.lasty = None
-        self.tracking = False
-        self.lastIm = 0
-        self.maxcontrast = 10000
         # self._plot_ref = [None, None] #first is main plot, second is line
-        self.iris = False
         self.gaussian = False
 
         # Set up the main window
-        self.setWindowTitle("ARDA - Alexander Poulin")
-        self.central_widget = QWidget()
-        self.setCentralWidget(self.central_widget)
+        # self.setWindowTitle("ARDA - Alexander Poulin")
+        # self.central_widget = QWidget()
+        # self.setCentralWidget(self.central_widget)
 
         layoutRow1, self.layoutCol1Row1, self.layoutCol1Row2, self.layoutCol1Row3 = QHBoxLayout(), QHBoxLayout(), QHBoxLayout(), QHBoxLayout()
         self.layoutCol2Row1, self.layoutCol2Row2, self.layoutCol2Row3, self.layoutCol2Row4 = QHBoxLayout(), QHBoxLayout(), QHBoxLayout(), QHBoxLayout()
@@ -68,47 +67,41 @@ class ARPESHome(QMainWindow):
         self.layoutCol2Col1.addLayout(self.layoutCol2Row6)
         self.layoutCol2.addLayout(self.layoutCol2Col1)
         layoutRow1.addLayout(self.layoutCol2)
-        self.central_widget.setLayout(layoutRow1)
+        # self.central_widget.setLayout(layoutRow1)
+        self.setLayout(layoutRow1)
 
     #setup the basic ui elements
     def setup_UI(self):
-        arpesDataObj = arpesData() #this is a class that holds the data for the arpes
+        self.arpesDataObj = arpesData() #this is a class that holds the data for the arpes
         
         
         #Main figure
-        arpesGraphFig = arpesGraph() #this is a widget class that holds the graph
-        arpesGraphFig.update_graph(arpesDataObj.tifArr)
+        self.arpesGraphFig = arpesGraph() #this is a widget class that holds the graph
+        self.arpesGraphFig.update_im(self.arpesDataObj.getCurrentTif(self.gaussian))
         
-        self.layoutCol1Row2Col1.addWidget(arpesGraphFig.canvas)
+        self.layoutCol1Row2Col1.addWidget(self.arpesGraphFig)
+        
+        #setup energy slider
+        self.energySlider = EnergySliderWidget()
+        self.layoutCol1Row2Col1.addWidget(self.energySlider)
+        self.energySlider.getSlider().valueChanged.connect(self.slider_value_changed) #on change, call slider_value_changed
+        
         
         #setup file manager widget
         self.filesWidget = filesWidget()
         self.layoutCol1Row1.addWidget(self.filesWidget)
-        self.files.update_dir.connect(self.get_dir_data)
-        self.files.update_flatfield_dir.connect(self.get_flatfield_data)
-        
-        
-        #add slider to slide through images
-        self.slider = QSlider(Qt.Orientation.Horizontal) #create new horizontal slider
-        if len(self.tif) <= 1:
-            self.slider.setRange(0, 100)
-            self.slider.setDisabled(True)
-        else:
-            self.slider.setRange(0, len(self.tif) - 1)  # Set the range of the slider to the number of images
-        self.slider.valueChanged.connect(self.slider_value_changed) #on change, call slider_value_changed
-        self.layoutCol1Row3.addWidget(self.slider, stretch=1)  # Add the slider to the layout with stretch=1 to make it take full width
         
         #setup submit button
         submitButton = QPushButton("Submit")
         submitButton.setFixedSize(200, 100)  # Set the fixed size of the button to create a square shape
-        submitButton.clicked.connect(self.interpl)
+        submitButton.clicked.connect(lambda : self.create_evm())
         self.layoutCol2Row5.addWidget(submitButton)
         
         #setup infoHead
-        self.info = QLabel(self.get_info())
+        self.info = QLabel(self.filesWidget.getDatInfoFull())
         self.info.setStyleSheet("border: 1px solid white;")
         #current energy level
-        self.currentEnergy = QLabel(f"Current Energy Level: {self.energyArr[0]}")
+        self.currentEnergy = QLabel(f"Current Energy Level: {self.arpesDataObj.getCurrentEnergy()[0]}")
         self.setupCurEnergy(0)
         self.layoutCol2Row1.addWidget(self.info)
         self.layoutCol2Row2.addWidget(self.currentEnergy)
@@ -119,7 +112,11 @@ class ARPESHome(QMainWindow):
         self.layoutCol2Row2.addWidget(self.gaussianToggle)
         
         
-        lineCoords = lineCoordsWidget()
+        self.lineCoords = lineCoordsWidget()
+        self.arpesGraphFig.mouse_graphpos_change.connect(lambda lastx, lasty: self.draw_line(lastx, lasty))
+        self.arpesGraphFig.mouse_graphpos_start.connect(lambda startx, starty: self.lineCoords.setTexts(startX = startx, startY = starty))
+        self.lineCoords.lineCoordsEdited.connect(lambda startx, starty, lastx, lasty: self.update_line_from_linecoords(startx, starty, lastx, lasty))
+
         
         
         
@@ -131,121 +128,163 @@ class ARPESHome(QMainWindow):
         self.contrast_slider = ColorRampWidget()
         
         # Create labels to display slider values
-        self.label_left = QLabel("Left: 0.00")
-        self.label_right = QLabel(f"Right: {self.maxcontrast:.2f}")
-        self.maxConstrastInput = QLineEdit()
-        self.maxConstrastInput.setFixedWidth(100)
-        self.maxConstrastInput.setText(f"{self.maxcontrast:.2f}")
+        self.label_vmin = QLabel("Left: 0.00")
+        self.label_vmax = QLabel(f"Right: 0.00")
+        self.maxContrastInput = QLineEdit()
+        self.maxContrastInput.setFixedWidth(100)
+        self.maxContrastInput.setText(f"{self.arpesGraphFig.getMaxContrast():.2f}")
         
         # Connect the slider signals
-        self.contrast_slider.valueChanged.connect(self.update_contrast)
-        self.maxConstrastInput.editingFinished.connect(self.update_maxcontrast)
+        self.contrast_slider.valueChanged.connect(lambda blackvalue, whitevalue: self.updateContrastMinMax(vmin=blackvalue, vmax=whitevalue, maxContrastText=self.maxContrastInput.text())) #the * unpacks the tuple
+        self.maxContrastInput.editingFinished.connect(lambda: self.updateContrastMinMax(maxContrastText=self.maxContrastInput.text()))
+
 
         # Add widgets to layout
         contrastH1Layout.addWidget(self.contrast_slider)
         contrastH1Layout.setStretch(0, 1)
-        contrastH2Layout.addWidget(self.label_left)
-        contrastH2Layout.addWidget(self.label_right)
-        contrastH2Layout.addWidget(self.maxConstrastInput)
+        contrastH2Layout.addWidget(self.label_vmin)
+        contrastH2Layout.addWidget(self.label_vmax)
+        contrastH2Layout.addWidget(self.maxContrastInput)
         contrastVLayout.addLayout(contrastH1Layout)
         contrastVLayout.addLayout(contrastH2Layout)
         self.layoutCol2Row4.addLayout(contrastVLayout)
         
-        # Connect the mouse events
-        arpesGraphFig.canvas.mpl_connect('button_press_event', self.plot_mouse_click)
-        arpesGraphFig.canvas.mpl_connect('motion_notify_event', self.plot_mouse_move)
-        arpesGraphFig.canvas.mpl_connect('button_release_event', self.plot_mouse_release)
         
-        #create colormap
+        
+        #create colormap selector
         self.colormap = QComboBox()
         self.colormap.addItems(plt.colormaps())
         self.layoutCol2Row5.addWidget(self.colormap)
-        self.colormap.currentTextChanged.connect(self.change_colormap)
+        self.colormap.currentTextChanged.connect(self.arpesGraphFig.change_colormap)
         
-        save_button_com(self, "Save File")
-        self.layoutCol2Row6.addWidget(self.save_button)
-        self.save_button.clicked.connect(self.save_file)
+        #####setup save button
+        # save_button_com(self, "Save File")
+        # self.layoutCol2Row6.addWidget(self.save_button)
+        # self.save_button.clicked.connect(self.save_file)
         
         #setup resetbutton
-        reset_button_com(self)
+        self.resetButton = ResetButton()
+        self.resetButton.getButton().clicked.connect(self.reset_line)
         self.layoutCol2Row6.addWidget(self.resetButton)
         
-    
-    #resets the line
-    def reset_line(self):
-        self.textLineX.setText("")
-        self.textLineY.setText("")
-        self.textLineFinalX.setText("")
-        self.textLineFinalY.setText("")
         
-        
-        self.lastx = None
-        self.lasty = None
-        self.startx = None
-        self.starty = None
-        
-        
-        #self.image_label.setPixmap(QPixmap.fromImage(ImageQt.ImageQt(self.im)))
-        self.resetButton.setStyleSheet("color : rgba(0, 0, 0, 0); background-color : rgba(0, 0, 0, 0); border : 0px solid rgba(0, 0, 0, 0);")
-        self.resetButton.hide()
-        
-        #self.ax.cla()
-        #self._plot_ref[1] = None
-        self._plot_ref[1].set_xdata(0)
-        self._plot_ref[1].set_ydata(0)
-        ############ note this is just a bandaid fix, not really good practice ###############3
-        self.canvas.draw()
-        
-    #get infohead
-    def get_info(self):
-        if self.dir_path == "":
-            return "No data loaded"
-        infoHead = get_info(self.dir_path, self.dat)
-        #print(f"infoHead: \n {infoHead}, \n {type(infoHead)}")
-        #FILE_ID, EXPERIMENT_NAME, MEASUREMENT_NAME, TIMESTAMP, INSTITUTION, SAMPLE
-        #columnsToInclude = ['FILE_ID*', 'EXPERIMENT_NAME*', 'MEASUREMENT_NAME*', 'TIMESTAMP*', 'INSTITUTION*', 'SAMPLE*']
-        #self.infoStr = infoHead.apply(lambda row: row.astype(str).values, axis=1) #this is an ndArray
-        #print(f"infoStr: \n {self.infoStr[0]}, \n {type(self.infoStr)}")
-        infoHead = infoHead.to_string(index=False, header=False)
-        return infoHead
+        # setup signals/connections
+        self.filesWidget.update_dir.connect(self.send_dir_data)
+        self.filesWidget.update_flatfield_dir.connect(self.send_flatfield_data)
     
     def setupCurEnergy(self, num):
-        self.currentEnergy.setText(f"Current Energy Level: {self.energyArr[num]}")
-    
-    def getImage(self):
-        if self.gaussian:
-            return gaussian_filter(self.tifArr[self.lastIm], sigma = 1.5)
-        else:
-            return self.tifArr[self.lastIm]
+        self.arpesDataObj.setCurrentEnergy(num)
+        self.currentEnergy.setText(f"Current Energy Level: {self.arpesDataObj.getCurrentEnergy()[0]}")
 
-    #(will updates the images) according to the slider value
+    #get everything from folder and setup data paths and image arrays 
+    def send_dir_data(self):
+        self.filesWidget.get_folder()
+        # print("got folder")
+        # print(f"tifNames: {self.filesWidget.getTifNames()}")
+        self.filesWidget.process_folder_data()
+        # print(f"tifArr one: send_dir_data: {self.filesWidget.getTiffArr()[0]}")
+        # print(f"tifArr nonzero: send_dir_data: {[np.nonzero(self.filesWidget.getTiffArr()[0])]}")
+        # print(f"dat: {self.filesWidget.getDatPath()}")
+        
+        ###Todo setup warning for when tifnames are gathered but tifArr fails for whatever reason, i.e. no wifi to onedrive
+        
+        if self.filesWidget.getDatPath() != "": ###TOdo do we want to keep this
+            # print("non empty dat path: send_dir_data")
+            self.filesWidget.get_energies_arr(self.filesWidget.getDirPath(), self.filesWidget.getDatPath())
+            self.filesWidget.setInfoFromDat(self.filesWidget.getDirPath(), self.filesWidget.getDatPath())
+            # self.energyArr = self.filesWidget.getEnergies()
+            # print(f"energyArr from filesWidget: {self.filesWidget.getEnergies()}")
+            self.arpesDataObj.setEnergyArr(self.filesWidget.getEnergies())
+            # print(f"tifArr from filesWidget before: {self.filesWidget.getTiffArr()}")
+            self.arpesDataObj.setTifArr(self.filesWidget.getTiffArr())
+            # print(f"tifArr from filesWidget after: {self.filesWidget.getTiffArr()}")
+        else:
+            print("WARNING: empty dat path: send_dir_data \n \n \n")
+        
+        self.arpesGraphFig.update_im(self.arpesDataObj.getCurrentTif(self.gaussian), set_default_clim=True)
+        # update maxcontrast to be 100% of the max value in the current tif since set_default_clim will set to np.max; was thinking at first 150 but just 100 for now
+        self.maxContrastInput.setText(str(self.arpesGraphFig.getMaxContrast()))
+        # print(f"send_dir_data: getCurrentTif: {self.arpesDataObj.getCurrentTif(self.gaussian)}")
+        self.energySlider.enable(len(self.filesWidget.getTifNames()) - 1)
+        # print(f"datinfoheader: {self.filesWidget.getDatInfoHeader()}")
+        self.info.setText(self.filesWidget.getDatInfoHeader())   
+        
+        
+    #resets the line
+    def reset_line(self):
+        self.lineCoords.setTexts(startX="", startY="", lastX="", lastY="")
+        
+        self.lineCoords.setTexts("", "", "", "")
+        
+        
+        self.resetButton.disable()
+        
+        self.arpesGraphFig.setPlotRef(1, 0, changeX=True, changeY=True)
+        
+     #(will updates the images) according to the slider value
+     
     def slider_value_changed(self, i):
-        self.lastIm = i
-        self.imageBuilder.build_image(self, self.getImage())
-        self.setupCurEnergy(i)
-        '''
-        if (self.lastx is not None and self.lasty is not None):
-            self.make_line((self.lastx, self.lasty))
-            '''
+        self.arpesDataObj.setCurrentEnergy(i)
+        # print(f"slider changed, current energy: {self.arpesDataObj.getCurrentEnergy()}")
+        # print(f"slider changed, current tif: {self.arpesDataObj.getCurrentTif(self.gaussian)}")
+        self.currentEnergy.setText(f"Current Energy Level: {self.arpesDataObj.getCurrentEnergy()[0]}")
+        self.arpesGraphFig.update_im(self.arpesDataObj.getCurrentTif(self.gaussian))
         
-    #on text change, update the line
-    def text_edited(self, s):
-        if (self.lastx is not None and self.lasty is not None and self.startx is not None and self.starty is not None):
-            #self.image_label.setPixmap(QPixmap.fromImage(ImageQt.ImageQt(self.im)))
-            self.lastx = float(self.textLineFinalX.text())
-            self.lasty = float(self.textLineFinalY.text())
-            self.startx = float(self.textLineX.text())
-            self.starty = float(self.textLineY.text())
-            self.make_line((self.lastx, self.lasty))
+    def toggleGaussian(self):
+        self.gaussian = not self.gaussian
+        self.arpesGraphFig.update_im(self, self.arpesDataObj.getCurrentTif(self.gaussian))
+        
+    def updateContrastMinMax(self, vmin = None, vmax = None, maxContrastText = None):
+        if maxContrastText is None:
+            maxContrastText = self.maxContrastInput.text()
+            
+        if vmin is None or vmax is None: #not defined in parameters, get it from update_max_contrast
+            # print("updateContrastMinMax: vmin and vmax is none")
+            vmin, vmax = self.arpesGraphFig.getCurrentVminVmax()
+            
+        self.arpesGraphFig.update_contrast(blackvalue = vmin, whitevalue = vmax)
+        self.arpesGraphFig.update_maxcontrast(maxContrastText)
+        # print(f"updateContrastMinMax: vmax, vmin: {vmax, vmin}")
+        self.arpesGraphFig.update_im(self.arpesDataObj.getCurrentTif())
+        self.updateVminVmaxTexts(vmin = vmin, vmax = vmax)
+            
+    def updateVminVmaxTexts(self, vmin = None, vmax = None):
+        #vmin and vmax currently are data as percent of the max contrast
+        if type(vmax) is float:
+            vmaxScaled = vmax * self.arpesGraphFig.getMaxContrast()
+            self.label_vmax.setText(f"Left: {vmaxScaled:.2f}")
+        if type(vmin) is float:
+            vminScaled = vmin * self.arpesGraphFig.getMaxContrast()
+            self.label_vmin.setText(f"Right: {vminScaled:.2f}")
+            
+    def update_line_from_linecoords(self, startx, starty, lastx, lasty):
+        self.lineCoords.setTexts(startX=startx, startY=starty, lastX=lastx, lastY=lasty)
+        self.arpesGraphFig.make_line_across(self.lineCoords.getPos())
+        self.arpesGraphFig.draw_graph()
+        
+    def draw_line(self, lastx, lasty):
+        if np.count_nonzero(self.arpesDataObj.getTifData()) == 0:
+            print("WARNING... tif data not yet set or all data is zeroed... exiting")
+            return None
+        self.lineCoords.setTexts(lastX = lastx, lastY = lasty)
+        self.arpesGraphFig.make_line_across(*self.lineCoords.getPos())
+        self.arpesGraphFig.draw_graph()
     
-    def show_new_image(self, result):
-        self.w = EnergyVMomentum(result, self.dir_path, self.tifArr, self.dat)
-        #w.result = result
-        self.w.show()
-        
     #save the file
     def save_file(self):
-        ArrayToVideo(self.tifArr, self.vmin, self.vmax, self)
+        saveWidgetManger = saveWidget()
+        ArrayToVideo(self.arpesDataObj.getTifData(), self.arpesGraphFig.getCurrentVminVmax()[0], self.arpesGraphFig.getCurrentVminVmax()[1], self)
+    
+    def create_evm(self):
+        resultEVMdata = self.arpesDataObj.interpl(*self.lineCoords.getPos(), vmin = self.arpesGraphFig.getCurrentVminVmax()[0], vmax = self.arpesGraphFig.getCurrentVminVmax()[1], posExtended = self.arpesGraphFig.getPosExtended())
         
+        # print(f"nonzero resultEVMdata: {np.count_nonzero(resultEVMdata)}")
         
+        # self.open_evm(resultEVMdata)
+        self.openEVM.emit(resultEVMdata, self.arpesDataObj.getEnergyArr(), self.arpesDataObj.getTifData())
+        
+    def send_flatfield_data(self):
+        self.arpesDataObj.get_flatfield_data(self.filesWidget.getFlatfieldInfo()[0])
+        self.energySlider.enable(len(self.filesWidget.getTifNames()) - 1)
+        self.info.setText(self.filesWidget.getDatInfoHeader())   
         

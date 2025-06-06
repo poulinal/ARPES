@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel
 
 class ColorRampWidget(QWidget):
     
-    valueChanged = pyqtSignal(float, float)
+    valueChanged = pyqtSignal(float, float) #send blackvalue, whitevalue
     
     def __init__(self, parent=None):
         super().__init__(parent)

@@ -6,11 +6,16 @@ from pandas import read_csv as pd
 
 # Converts all Tiff files in the form of an array
 def tiff_im(path, tif):
+    # print(f"tiff_im, tifnames: {tif}")
     tifIm = []
-    for tiffName in tif: 
+    for i, tiffName in enumerate(tif): 
         tiffFile = Image.open(path + "/" + tiffName) #open the tiff file
+        
+        # print(f"tiff_im, tiffFile: {tiffFile, i}")
         imArray = np.array(tiffFile) #put the image into an array
+        # print(f"tiff_im, imArray nonzero: {np.nonzero(imArray)}")
         tifIm.append(imArray) #saves the tiff image array
+    # print(f"tiff_im, tifIm: {tifIm}")
     return tifIm
 
 # Gets the energies from the tiff files

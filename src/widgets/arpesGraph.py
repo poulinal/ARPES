@@ -1,11 +1,17 @@
 ### 2025 Alexander Poulin
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QSizePolicy
+from PyQt6.QtCore import pyqtSignal
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from src.widgets.plottoolbar import matplotToolbar
 import numpy as np
 
 class arpesGraph(QWidget):
+    mouse_graphpos_change = pyqtSignal(float, float)
+    mouse_graphpos_start = pyqtSignal(float, float)
+    
+    ##TODO: allow for nonlinear colorramps
+    
     def __init__(self):
         super().__init__()
         #figure vars:
@@ -14,11 +20,26 @@ class arpesGraph(QWidget):
         self.canvas = FigureCanvas(self.figure) # this is the Canvas Widget that displays the `figure`
         self.toolbar = matplotToolbar(self.canvas, self)
         #plot vars:
-        self._plot_ref = [None, None] #first is main plot, second is line
+        # self._plot_ref = [None, None] #first is main plot, second is line
+        self._plot_ref = {}
         self.vmin = None
         self.vmax = None
+        self.scaledVmin = None
+        self.scaledVmax = None
+        self.maxcontrast = 10000
+        self.tracking = False
+        
+        self.posExtended = None ##Todo should we really keep this as class var, is it possible to send by signal or preferably return it?
+        
+        
+        # Connect the mouse events
+        self.canvas.mpl_connect('button_press_event', self.plot_mouse_click) ###Todo make a signal out to arpesHome
+        self.canvas.mpl_connect('motion_notify_event', self.plot_mouse_move)
+        self.canvas.mpl_connect('button_release_event', self.plot_mouse_release)
         
         layout = QVBoxLayout()
+        layout.addWidget(self.toolbar)
+        layout.addWidget(self.canvas)
 
         self.setLayout(layout)
         
@@ -35,88 +56,129 @@ class arpesGraph(QWidget):
         self.figure.patch.set_facecolor('white')
         self.figure.patch.set_alpha(0)
         
-        self.figure.tight_layout()
+        # self.figure.tight_layout(True)
         self.canvas.setStyleSheet("background-color:transparent;")
-        self.canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        # self.canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.setMinimumSize(208, 81)
         
         self.ax.axis('off')  # Turn off axes
-        self.ax.autoscale(False)
-        self.figure.tight_layout()
+        self.ax.autoscale(True)
+        # autoScaledFigSize = self.figure.get_size_inches()
+        # self.ax.autoscale(False)
+        # self.figure.set_size_inches(autoScaledFigSize) ###TOdo: make this better
+        
+        # self.ax.autoscale(False)
+        self.figure.tight_layout(pad = 0, h_pad = 0, w_pad = 0, rect = [0, 0, 1, 1]) #pad is the padding between the figure and the axes, h_pad is the padding between the top and bottom of the figure, w_pad is the padding between the left and right of the figure, rect is the rectangle to which the figure is drawn
+        
+        
+    def getMaxContrast(self):
+        return self.maxcontrast
     
-    def update_graph(self, im):
+    def getCurrentVminVmax(self):
+        return self.vmin, self.vmax
+    
+    def setPlotRef(self, refIndex, value, changeX=False, changeY=False):
+        if changeX:
+            self._plot_ref[refIndex].set_xdata(value)
+        if changeY:
+            self._plot_ref[refIndex].set_ydata(value)
+            
+    def draw_graph(self):
+        self.canvas.draw()
+        
+    def update_im(self, im: np.ndarray, set_default_clim: bool = False, extent: tuple = None):
         """sumary_line
         builds a plot based on the plot references (for performance)
         
         Keyword arguments:
         im - image array (should be given directly)
+        set_default_clim - if True, autosets the vmin and vmax to the min and max of the image
+        extent - the extent of the image, if None, it will be set to (0, im.shape[1], 0, im.shape[0]), otherwise it should be a tuple of (xmin, xmax, ymin, ymax); example for evm it is: (0, result.shape[1], energiesLow, energiesHigh)
         Return: return_description
         """
-        if (self._plot_ref[0] is None):
+        # self.ax.cla()  # Clear axes
+        # self.ax.axis('off')  # If you want to keep axes off
+        # self.canvas.draw()
+        # print(f"shape of im: {im.shape}")
+        # print(f"extent: {extent}")
+        if extent is None:
+            extentDefault = True
+            extent = (0, im.shape[1], 0, im.shape[0]) #default extent is (xmin, xmax, ymin, ymax, yvalueAtMin, yvalueAtMax)
+        else:
+            extentDefault = False
+            if len(extent) != 4:
+                raise ValueError("extent should be a tuple of (xmin, xmax, ymin, ymax, yvalueAtMin, yvalueAtMax)")
+            # print(f"update_im: im: {im.shape}")
+            # print(f"nonzero im: {np.count_nonzero(im)}")
+
+        if ('mainGraph' not in self._plot_ref.keys()):
+            # print(f"update_im: self.__plot_ref is None")
             new_vmin = np.min(im)
             new_vmax = np.max(im)
-            plot_refs = self.ax.imshow(im, cmap='gray', vmin = new_vmin, vmax = new_vmax)
-            self._plot_ref[0] = plot_refs
+            self.vmin = new_vmin
+            self.vmax = new_vmax
+            self.scaledVmax = new_vmax * self.maxcontrast
+            self.scaledVmin = new_vmin * self.maxcontrast
+            plot_refs = self.ax.imshow(im, cmap='gray', vmin = self.scaledVmin, vmax = self.scaledVmax, extent=extent, interpolation='bilinear')
+            # plot_refs = self.ax.imshow(im, cmap='gray')
+            self._plot_ref['mainGraph'] = plot_refs
         else:
-            self._plot_ref[0].set_data(im)
-        if (self.vmax is not None and self.vmin is not None):
-            self._plot_ref[0].set_clim(vmin=self.vmin, vmax=self.vmax)
-        elif (self.vmin is not None):
-            self._plot_ref[0].set_clim(vmin=self.vmin)
-        elif (self.vmax is not None):
-            self._plot_ref[0].set_clim(vmax=self.vmax)
+            # print(f"update_im: self.__plot_ref is Not None")
+            self._plot_ref['mainGraph'].set_data(im) #set data to im
+            #correct range to plot entire range of data
+            self.ax.set_xlim(0, im.shape[1]) #Todo do we need this?? before we did but now it seems to be messing up EVM with the extend
+            self.ax.set_ylim(im.shape[0], 0)
             
-        self.figure.tight_layout()
-        self.canvas.draw()
+            if set_default_clim == True:
+                imMax = np.max(im)
+                self._plot_ref['mainGraph'].set_clim(vmin = np.min(im), vmax = imMax)
+                self.update_maxcontrast(imMax)
+            elif (self.scaledVmax is not None and self.scaledVmin is not None):
+                # print(f"update_im: scaledVmin, scaledVmax: {self.scaledVmin, self.scaledVmax}")
+                self._plot_ref['mainGraph'].set_clim(vmin=self.scaledVmin, vmax=self.scaledVmax)
+            elif (self.scaledVmin is not None):
+                print(f"WARNING... update_im: only scaledVmin is not None")
+                self._plot_ref['mainGraph'].set_clim(vmin=self.scaledVmin)
+            elif (self.scaledVmax is not None):
+                print(f"WARNING... update_im: only scaledVmax is not None")
+                self._plot_ref['mainGraph'].set_clim(vmax=self.scaledVmax)
+        
+        self.ax.set_aspect(extent[1] / (extent[3] - extent[2]), anchor='C') if not extentDefault else None #set aspect ratio to match the image
+        self.ax.set_xlim(extent[0], extent[1]) if not extentDefault else None #set xlim to match the image
+        self.ax.set_ylim(extent[2], extent[3]) if not extentDefault else None #set ylim to match the image
+        
+        
+            
+        # print(f"update_im before draw: vmin: {self.vmin}, vmax: {self.vmax}")
+        # input("press enter to continue...")
+        # self.figure.tight_layout()
+        self.draw_graph()
         
     def change_colormap(self, text):
-        self._plot_ref[0].set_cmap(text)
+        self._plot_ref['mainGraph'].set_cmap(text)
         self.canvas.draw()
         
-        
-    #resets the line
-    def reset_line(self):
-        self.textLineX.setText("")
-        self.textLineY.setText("")
-        self.textLineFinalX.setText("")
-        self.textLineFinalY.setText("")
-        
-        
-        self.lastx = None
-        self.lasty = None
-        self.startx = None
-        self.starty = None
-        
-        
-        #self.image_label.setPixmap(QPixmap.fromImage(ImageQt.ImageQt(self.im)))
-        self.resetButton.setStyleSheet("color : rgba(0, 0, 0, 0); background-color : rgba(0, 0, 0, 0); border : 0px solid rgba(0, 0, 0, 0);")
-        self.resetButton.hide()
-        
-        #self.ax.cla()
-        #self._plot_ref[1] = None
-        self._plot_ref[1].set_xdata(0)
-        self._plot_ref[1].set_ydata(0)
-        ############ note this is just a bandaid fix, not really good practice ###############3
-        self.canvas.draw()
-        
-    
-    def toggleGaussian(self):
-        self.gaussian = not self.gaussian
-        self.imageBuilder.build_image(self, self.getImage())
         
         
      #start point on click
-     
+    
+    def getCanvas(self):
+        """Returns the canvas of the graph"""
+        return self.canvas
+    
+    def getFigureSize(self):
+        return self.figure.get_size_inches()
      
     def plot_mouse_click(self, e):
-        self.resetButton.show()
-        self.resetButton.setStyleSheet("")
+        # self.resetButton.show()
+        # self.resetButton.setStyleSheet("")
         self.tracking = not self.tracking
         if e.inaxes:
-            self.startx = e.xdata
-            self.starty = e.ydata
-            self.textLineX.setText(str(self.startx))
-            self.textLineY.setText(str(self.starty))
-        #print(f"startx: {self.startx}, starty: {self.starty}")
+            startx = e.xdata
+            starty = e.ydata
+            self.mouse_graphpos_start.emit(startx, starty)
+            
          
     def plot_mouse_move(self, e):
         if e.inaxes and self.tracking:
@@ -124,7 +186,8 @@ class arpesGraph(QWidget):
             pos = (e.xdata, e.ydata)
             self.lastx = e.xdata
             self.lasty = e.ydata
-            self.make_line(pos)
+            self.mouse_graphpos_change.emit(pos[0], pos[1]) ###Todo double check if this is value or relative x-y
+            # self.make_line(self.getPos())
             #print(f"lastx: {self.lastx}, lasty: {self.lasty}")
             
     #release stop tracking
@@ -133,56 +196,132 @@ class arpesGraph(QWidget):
         
         
     def update_contrast(self, blackvalue, whitevalue):
-        #print(f"black: {blackvalue}, white: {whitevalue}")
-        self.vmin = blackvalue * self.maxcontrast
-        self.vmax = whitevalue * self.maxcontrast
-        self.label_left.setText(f"Left: {self.vmin:.2f}")
-        self.label_right.setText(f"Right: {self.vmax:.2f}")
-        #self.slider_right.setMinimum(value)
-        #self._plot_ref[0].set_clim(vmin=self.vmin)
-        self.imageBuilder.build_image(self, self.getImage())
-        #self.update()
+        # print(f"black: {blackvalue}, white: {whitevalue}")
+        if type(blackvalue) is float:
+            self.vmin = blackvalue
+            self.scaledVmin = blackvalue * self.maxcontrast
+        if type(whitevalue) is float:
+            self.vmax = whitevalue
+            self.scaledVmax = whitevalue * self.maxcontrast
+        
+        return self.scaledVmax, self.scaledVmin
     
-    def update_maxcontrast(self):
-        self.maxcontrast = float(self.maxConstrastInput.text())
-        self.label_right.setText(f"{self.maxcontrast:.2f}")
+    def update_maxcontrast(self, maxContrastInput):
+        """Given maxContrastInput, sets the maxcontrast and updates scaled vmin and vmax
+        
+        Keyword arguments:
+        argument -- description
+        Return: self.vmin, self.vmax
+        """
+        
+        # print(f"maxContrastInput: {maxContrastInput}")
+        self.maxcontrast = float(maxContrastInput)
+        if self.vmin is not None and self.vmax is not None:
+            # print(f"update_maxcontrast: vvmin and vmax is not none")
+            self.scaledVmin = self.vmin * self.maxcontrast
+            self.scaledVmax = self.vmax * self.maxcontrast
+        # self.vmax = self.maxcontrast
+        ###most of the time we will want to call update_contrast after
+        return self.vmin, self.vmax
+        # self.label_right.setText(f"{self.maxcontrast:.2f}")
+        
+    def update_line(self, xpos, ypos, colorline = 'yellow'):
+        if 'lineCut' not in self._plot_ref.keys():
+            plot_refs = self.ax.plot(xpos, ypos, '-', color=colorline)
+            self._plot_ref['lineCut'] = plot_refs[0]
+        else:
+            # We have a reference, we can use it to update the data for that line.
+            self._plot_ref['lineCut'].set_xdata(xpos)
+            self._plot_ref['lineCut'].set_ydata(ypos)
+        
+        
         
         
     #draws the line  
-    def make_line(self, pos):
-        if (self.startx is None or self.starty is None or self.lastx is None or self.lasty is None):
+    def make_line_across(self, startx, starty, lastx, lasty):
+        if (startx == "" or starty == "" or lastx == "" or lasty == ""):
+            print(f"WARNING... empty string where {startx, starty, lastx, lasty}")
             return
         
-        posExt, distance = self.extend_line(pos)
+        if type(startx) is str or type(starty) is str or type(lastx) is str or type(lasty) is str: #cast to float
+            startx = float(startx)
+            starty = float(starty)
+            lastx = float(lastx)
+            lasty = float(lasty)
+        else:
+            print(f"WARNING... non string where {startx, starty, lastx, lasty}")
+
+            return
+        
+        posExt, distance = self.extend_line(startx, starty, lastx, lasty)
         #posExt starts from top left to whereever the line ends
         
-        if self._plot_ref[1] is None:
-            plot_refs = self.ax.plot(posExt[0], posExt[1], '-', color='yellow')
-            self._plot_ref[1] = plot_refs[0]
-        else:
-            # We have a reference, we can use it to update the data for that line.
-            self._plot_ref[1].set_xdata(posExt[0])
-            self._plot_ref[1].set_ydata(posExt[1])
+        self.update_line(posExt[0], posExt[1])
+        # if 'lineCut' not in self._plot_ref.keys():
+        #     plot_refs = self.ax.plot(posExt[0], posExt[1], '-', color='yellow')
+        #     self._plot_ref['lineCut'] = plot_refs[0]
+        # else:
+        #     # We have a reference, we can use it to update the data for that line.
+        #     self._plot_ref['lineCut'].set_xdata(posExt[0])
+        #     self._plot_ref['lineCut'].set_ydata(posExt[1])
         #print(f"x_ext: {posExt[0]}, y_ext: {posExt[1]}")
         
-        self.textLineFinalX.setText(str(pos[0]))
-        self.textLineFinalY.setText(str(pos[1]))
+        # self.textLineFinalX.setText(str(pos[0]))
+        # self.textLineFinalY.setText(str(pos[1]))
         
-        self.canvas.draw()
-    
-    def extend_line(self, pos):
-        xlim = self.ax.get_xlim()
-        ylim = self.ax.get_ylim() #this is max height then the minimum
+        # self.canvas.draw()
+        
+        
+    def make_line_partial(self, startx, starty, lastx, lasty):
+        """Creates a line from startx, starty to lastx, lasty, extending it to the edges of the graph.
+        
+        Keyword arguments:
+        startx -- x coordinate of the start point
+        starty -- y coordinate of the start point
+        lastx -- x coordinate of the end point
+        lasty -- y coordinate of the end point
+        """
+        if (startx == "" or starty == "" or lastx == "" or lasty == ""):
+            print(f"WARNING... empty string where {startx, starty, lastx, lasty}")
+            return
+        
+        if type(startx) is str or type(starty) is str or type(lastx) is str or type(lasty) is str:
+            startx = float(startx)
+            starty = float(starty)
+            lastx = float(lastx)
+            lasty = float(lasty)
 
-        distance = np.sqrt((pos[0] - self.startx)**2 + (pos[1] - self.starty)**2)
+        xpos = np.arange(startx, lastx + 1, 1)
+        ypos = np.arange(starty, lasty + 1, 1)
+        self.update_line(xpos, ypos)
+        # if 'lineCut' not in self._plot_ref:
+        #     plot_refs = self.ax.plot([startx, lastx], [starty, lasty], '-', color='yellow')
+        #     self._plot_ref['lineCut'] = plot_refs[0]
+        # else:
+        #     # We have a reference, we can use it to update the data for that line.
+        #     self._plot_ref['lineCut'].set_xdata([startx, lastx])
+        #     self._plot_ref['lineCut'].set_ydata([starty, lasty])
+        # self.textLineFinalX.setText(str(lastx))
+        # self.textLineFinalY.setText(str(lasty))
+        # self.canvas.draw()
+    
+    def extend_line(self, startx, starty, lastx, lasty):
         
-        if self.startx == pos[0]: #verticle line
-            x_ext = np.full(int(ylim[0] - ylim[1]), self.startx)
+        xlim = self.ax.get_xlim() #this is max height then the minimum
+        ylim = self.ax.get_ylim() 
+        xlim = (xlim[0], xlim[1] - 1) #for some reason, these go from 0 to 1024 but tiffs are 1024 by 1024 (0 to 1023), so we need to subtract 1
+        ylim = (ylim[0] - 1, ylim[1]) #same here, but for y axis
+        # print(f"xlim: {xlim}, ylim: {ylim}")
+
+        distance = np.sqrt((lastx - startx)**2 + (lasty - starty)**2)
+        
+        if startx == lastx: #verticle line
+            x_ext = np.full(int(ylim[0] - ylim[1]), startx)
             y_ext = np.linspace(ylim[1], ylim[0], int(ylim[0] - ylim[1]))
             return (x_ext, y_ext), distance 
         
-        fx = np.polyfit([self.startx, pos[0]], [self.starty, pos[1]], deg=1)
-        fy = np.polyfit([self.starty, pos[1]], [self.startx, pos[0]], deg=1)
+        fx = np.polyfit([startx, lastx], [starty, lasty], deg=1)
+        fy = np.polyfit([starty, lasty], [startx, lastx], deg=1)
         
         #here start means where xintercept is, and final means where the line would intersect with the upperbound of the box (i.e. the right side for x)
         xfinal = np.poly1d(fy)(xlim[1])
@@ -234,111 +373,133 @@ class arpesGraph(QWidget):
             distance = xlim[1] - xlim[0]
             x_ext = np.linspace(xlim[0], xlim[1], int(distance))
             y_ext = np.linspace(ystart, ystart, int(distance))
+            
+        self.setPosExtended(x_ext, y_ext)
         
         return (x_ext, y_ext), distance
-        
-    #interpolate the line to go across the image
-    def interpl(self): 
-        if (self.lastx is None or self.lasty is None or self.startx is None or self.starty is None):
-            return
-        posExt, distance = self.extend_line((self.lastx, self.lasty))
-        #print(f"posExt: {posExt}")
-        if (posExt[0] is None or posExt[1] is None):
-            return #make sure there is a line to interpolate
-        
-        #maybe add some checks here to dumbproof
-        
-        #only return those points in the array which align with x_new and y_new
-        #result = np.zeros(shape = (len(posExt[0]), len(posExt[1]))) #this will eventually be converted to image so should be height by width (height is number of images, width is distance of selection)
-        #result = np.zeros(shape = (int(len(self.tifArr)), int(distance)))
-        result = np.zeros(shape = (int(len(self.tifArr)), self.tifArr[0].shape[0])) #note shape is row, col
-        imIndex = 0
-        print(f"posExt: {posExt}")
-        for tiffIm in self.tifArr:
-            for i in range(result.shape[1] - 1):
-                #data point on the exact point (note posExt[0] is x coordinates along line, posExt[1] is y coordinates along line)
-                nearestXPix = int(posExt[0][i])
-                nearestYPix = int(posExt[1][i])
-                
-                #gamma = self.distanceWeightedAverage(nearestXPix, nearestYPix, posExt[0], posExt[1], 2)
-                #dataPoint = gamma * tiffIm[nearestXPix][nearestYPix]
-                
-                dataPoint = tiffIm[nearestXPix][nearestYPix]
-                #dataPoint = self.distanceWeightedAverage(nearestXPix, nearestYPix, posExt[0][i], posExt[1][i], 2) * tiffIm[nearestXPix][nearestYPix]
-                
-                #posExt[0][i] gets the xpoint on that iteration
-                
-                cluster_data = 1 #amount of points we cluster --for average later
-                #if (posExt[0][i] < 0 or posExt[0][i] >= 1024 or posExt[1][i] < 0 or posExt[1][i] >= 1024):
-                #dataPoint += tiff_im[int(posExt[0][i])][int(posExt[1][i])]
-                
-                
-                if (nearestXPix > 0): #can go to left for cluster
-                    dataPoint += tiffIm[nearestXPix - 1][nearestYPix]
-                    #dataPoint += self.distanceWeightedAverage(nearestXPix - 1, nearestYPix, posExt[0][i], posExt[1][i], 2) * tiffIm[nearestXPix - 1][nearestYPix]
-                    cluster_data += 1
-                    
-                    #diagonal left up and down
-                    if (nearestXPix > 0): #can go to up for cluster
-                        dataPoint += tiffIm[nearestXPix - 1][nearestYPix - 1]
-                        cluster_data += 1
-                        #dataPoint += self.distanceWeightedAverage(nearestXPix - 1, nearestYPix - 1, posExt[0][i], posExt[1][i], 2) * tiffIm[nearestXPix - 1][nearestYPix - 1]
-                    if (nearestXPix < self.tifArr[0].shape[0] - 1): #can go to down for cluster
-                        dataPoint += tiffIm[nearestXPix - 1][nearestYPix + 1]
-                        cluster_data += 1
-                        #dataPoint += self.distanceWeightedAverage(nearestXPix - 1, nearestYPix + 1, posExt[0][i], posExt[1][i], 2) * tiffIm[nearestXPix - 1][nearestYPix + 1]
-                    
-                if (nearestXPix < self.tifArr[0].shape[1] - 1): #can go to right for cluster
-                    dataPoint += tiffIm[nearestXPix + 1][nearestYPix]
-                    cluster_data += 1
-                    #dataPoint += self.distanceWeightedAverage(nearestXPix + 1, nearestYPix, posExt[0][i], posExt[1][i], 2) * tiffIm[nearestXPix + 1][nearestYPix]
-                    
-                    #diagonal right up and down
-                    if (nearestXPix > 0): #can go to up for cluster
-                        dataPoint += tiffIm[nearestXPix + 1][nearestYPix - 1]
-                        cluster_data += 1
-                        #dataPoint += self.distanceWeightedAverage(nearestXPix + 1, nearestYPix - 1, posExt[0][i], posExt[1][i], 2) * tiffIm[nearestXPix + 1][nearestYPix - 1]
-                    if (nearestYPix < self.tifArr[0].shape[0] - 1): #can go to down for cluster
-                        dataPoint += tiffIm[nearestXPix + 1][nearestYPix + 1]
-                        cluster_data += 1
-                        #dataPoint += self.distanceWeightedAverage(nearestXPix + 1, nearestYPix + 1, posExt[0][i], posExt[1][i], 2) * tiffIm[nearestXPix + 1][nearestYPix + 1]
-                    
-                if (nearestYPix > 0): #can go to up for cluster
-                    dataPoint += tiffIm[nearestXPix][nearestYPix - 1]
-                    cluster_data += 1
-                    #dataPoint += self.distanceWeightedAverage(nearestXPix, nearestYPix - 1, posExt[0][i], posExt[1][i], 2) * tiffIm[nearestXPix][nearestYPix - 1]
-                
-                if (nearestYPix < self.tifArr[0].shape[0] - 1): #can go to down for cluster
-                    dataPoint += tiffIm[nearestXPix][nearestYPix + 1]
-                    cluster_data += 1
-                    #dataPoint += self.distanceWeightedAverage(nearestXPix, nearestYPix + 1, posExt[0][i], posExt[1][i], 2) * tiffIm[nearestXPix][nearestYPix + 1]
-                    
-                if cluster_data > 1:
-                    dataPoint = dataPoint / cluster_data
-                
-                
-                
-                if self.vmin is not None and self.vmax is not None:
-                    #print(f"datapoint: {dataPoint}")
-                    #dataPoint = (dataPoint - self.vmin) / (self.vmax - self.vmin)
-                    dataPoint = np.clip(dataPoint, self.vmin, self.vmax)
-                    #print(f"new datapoint: {dataPoint}")
-                result[imIndex][i] = dataPoint
-            imIndex += 1
+    
+    def setPosExtended(self, x_ext, y_ext):
+        self.posExtended = (x_ext, y_ext)
+        return self.posExtended
+
+    def getPosExtended(self):
+        return self.posExtended  
+    
+    
+    #integrate over y
+    def integrateY(self, evmData, startx, starty, lastx, lasty, extent):
+        typePlot = "MDC"
+        #create new window
+        if(startx is None or starty is None or lastx is None or lasty is None) or (startx == '' or starty == '' or lastx == '' or lasty == ''): #if none given, integrate over entire data
+            print("Not given all four coords, so user defined box... integrating over entire dataset")
+            # self.datax = 0
+            # self.datay = self.evmData.shape[0]
+            # self.dataLastx = self.energiesLow
+            # self.dataLasty = self.energiesHigh
+            selectedBox = evmData
+        else:
+            print(f"extent: {extent}")
+            extentyHigh = extent[3]
+            extentyLow = extent[2]
+            minstarty = min(starty, lasty)
+            maxstarty = max(starty, lasty)
+            spacing = (extentyHigh - extentyLow) / (evmData.shape[0] - 1)
+            spacing_to_integer_factor = 1 / spacing if spacing > 0 else print("WARNING... spacing is 0 most likely due to evmData.shape[0], the y-axis energy")
+            print(f"spacing: {spacing}, space factor: {spacing_to_integer_factor}, minstarty: {minstarty, type(minstarty)}, maxstarty: {maxstarty, type(maxstarty)}")
+            print(f"linspace params: {minstarty * spacing_to_integer_factor}, {maxstarty * spacing_to_integer_factor}, {spacing * spacing_to_integer_factor}")
+            arraySelectedY = np.linspace(minstarty * spacing_to_integer_factor, maxstarty * spacing_to_integer_factor, spacing * spacing_to_integer_factor)
             
-        result = result.astype(float)
-        #print(result)
-        result = np.flip(result, axis=0)
-        self.show_new_image(result)
-        return
+            
+            print(f"y selected box: {arraySelectedY}, with spacing: {spacing}, spacing factor: {spacing_to_integer_factor}, minstarty: {minstarty}, maxstarty: {maxstarty}")
+            print(f"x selected box: {evmData[:,int(min(startx, lastx)): int(max(startx, lastx))]}")
+            selectedBox = evmData[np.linspace(minstarty * spacing_to_integer_factor, maxstarty * spacing_to_integer_factor, spacing * spacing_to_integer_factor), int(min(startx, lastx)): int(max(startx, lastx))] 
+            # selectedBox = evmData[int(min(starty, lasty)): int(max(starty, lasty)), 
+            #                           int(min(startx, lastx)): int(max(startx, lastx))] 
+            #better yet... we know the length of it and that it must be linearly spaced, so based on the length, we first zero it out by subtracting the starty, lasty with the minimum. then we take the full length and divide it by the total difference
+            
+        #now given box, integrate over y
+        mdcResult = np.zeros(shape = (1, selectedBox.shape[1]))
+        print(f"mdcResults shape: {mdcResult.shape}")
+        for row in range(selectedBox.shape[0]): #range of result height
+            mdcResult[0] += selectedBox[row]
+        mdcResult = mdcResult.astype(float)
+        return mdcResult
     
+    #Todo double check these integrations are correct
     
-    def distanceWeightedAverage(self, x, y, x_new, y_new, p):
-        ### p is the power of the distance
-        ### x and y are the coordinates of the point we are trying to find the value of
-        ### x_new and y_new are the coordinates of the point we are trying to find the value of
-        ### returns the weighted average of the point
-        gamma = 0
-        for i in range(len(x_new)):
-            gamma += (1 / (np.sqrt((x_new[i] - x)**2 + (y_new[i] - y)**2))**p)
-        return gamma
+    #integrate over x
+    def integrateX(self, evmData, startx, starty, lastx, lasty):
+        typePlot = "EDC"
+        #create new window
+        if (startx is None or starty is None or lastx is None or lasty is None) or (startx == '' or starty == '' or lastx == '' or lasty == ''): #if none given, integrate over entire data
+            print("Not given all four coords, so user defined box... integrating over entire dataset")
+            # self.datax = 0
+            # self.datay = self.evmData.shape[0]
+            # self.dataLastx = self.energiesLow
+            # self.dataLasty = self.energiesHigh
+            selectedBox = evmData
+        else:
+            print(f"startx, starty, lastx, lasty: {startx, starty, lastx, lasty}")
+            selectedBox = evmData[int(min(starty, lasty)): int(max(starty, lasty)), 
+                                      int(min(startx, lastx)): int(max(startx, lastx))]
+        print(f"selectedbox: {selectedBox}")
+            
+        #now given box, integrate over y
+        edcResult = np.zeros(shape = (1, selectedBox.shape[1])) #essentially length of x
+        print(f"edcResult shape: {edcResult.shape}, rowRange: {selectedBox.shape[1]}, colRange: {len(evmData[0])}, box shape: {selectedBox.shape}")
+        for col in range(selectedBox.shape[0]):
+            for row in range(selectedBox.shape[1]): #range of result height
+                edcResult[0][col] += selectedBox[row][col]
+        edcResult = edcResult.astype(float)
+        return edcResult
+        
+        
+    #create the boxed area
+    def create_area(self, startx, starty, lastx, lasty):
+        # if x0 or y0 or xf or yf: #TOdo secure if str not float
+        x0 = float(startx)
+        y0 = float(starty)
+        xf = float(lastx)
+        yf = float(lasty)
+        xLength = abs(x0 - xf)
+        yLength = abs(y0 - yf)
+        dataTopX = np.linspace(x0, xf, int(xLength))
+        dataTopY = np.linspace(y0, y0, int(xLength))
+        dataBottomX = np.linspace(x0, xf, int(xLength))
+        dataBottomY = np.linspace(yf, yf, int(xLength))
+        dataLeftX = np.linspace(x0, x0, int(xLength))
+        dataLeftY = np.linspace(y0, yf, int(xLength))
+        dataRightX = np.linspace(xf, xf, int(xLength))
+        dataRightY = np.linspace(y0, yf, int(xLength))
+        
+        # Note: With this reference below, we no longer need to clear the axis.
+        #Note: this takes more to store the references, but it is faster
+        if 'rectangleTop' not in self._plot_ref or 'rectangleBottom' not in self._plot_ref or 'rectangleLeft' not in self._plot_ref is None or 'rectangleRight' not in self._plot_ref:
+            # First time we have no plot reference, so do a normal plot.
+            # .plot returns a list of line <reference>s, as we're
+            # only getting one we can take the first element.
+            plot_refs = self.ax.plot(dataTopX, dataTopY, '-', color='yellow')
+            self._plot_ref['rectangleTop'] = plot_refs[0]
+            plot_refs = self.ax.plot(dataBottomX, dataBottomY, '-', color='yellow')
+            self._plot_ref['rectangleBottom'] = plot_refs[0]
+            plot_refs = self.ax.plot(dataLeftX, dataLeftY, '-', color='yellow')
+            self._plot_ref['rectangleLeft'] = plot_refs[0]
+            plot_refs = self.ax.plot(dataRightX, dataRightY, '-', color='yellow')
+            self._plot_ref['rectangleRight'] = plot_refs[0]
+            #print(f"dataTopX: {dataTopX}, dataTopY: {dataTopY}, dataBottomX: {dataBottomX}, dataBottomY: {dataBottomY}, dataLeftX: {dataLeftX}, dataLeftY: {dataLeftY}, dataRightX: {dataRightX}, dataRightY: {dataRightY}")
+        else:
+            # We have a reference, we can use it to update the data for that line.
+            self._plot_ref['rectangleTop'].set_ydata(dataTopY)
+            self._plot_ref['rectangleTop'].set_xdata(dataTopX)
+            self._plot_ref['rectangleBottom'].set_ydata(dataBottomY)
+            self._plot_ref['rectangleBottom'].set_xdata(dataBottomX)
+            self._plot_ref['rectangleLeft'].set_ydata(dataLeftY)
+            self._plot_ref['rectangleLeft'].set_xdata(dataLeftX)
+            self._plot_ref['rectangleRight'].set_ydata(dataRightY)
+            self._plot_ref['rectangleRight'].set_xdata(dataRightX)
+            #'''
+        # self.canvas.draw()
+        self.draw_graph()
+        
+        
+              
