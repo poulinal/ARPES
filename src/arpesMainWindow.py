@@ -4,27 +4,7 @@ from PyQt6.QtWidgets import QApplication, QMainWindow, QTabWidget, QWidget, QVBo
 from src.arpesHome import ARPESHome
 from src.energyVmomentum import EnergyVMomentum
 from src.distributionCurve import DistCrve
-
-class TabContent(QWidget):
-    """Content class for each tab"""
-    def __init__(self, tab_number):
-        super().__init__()
-        self.tab_number = tab_number
-        
-        
-        self.init_ui()
-    
-    def init_ui(self):
-        layout = QVBoxLayout()
-        
-        # Add some content to demonstrate the tab
-        # label = QLabel(f"This is Tab {self.tab_number}")
-        # button = QPushButton(f"Button in Tab {self.tab_number}")
-        # button.clicked.connect(lambda : print(f"Button clicked in tab {self.tab_number}"))
-        
-        # layout.addWidget(label)
-        # layout.addWidget(button)
-        self.setLayout(layout)
+from src.widgets.advancedTabWidget import AdvancedTabWidget
 
 class ARPESMainWindow(QMainWindow):
     def __init__(self):
@@ -43,7 +23,7 @@ class ARPESMainWindow(QMainWindow):
         layout = QVBoxLayout(central_widget)
         
         # Create tab widget
-        self.tab_widget = QTabWidget()
+        self.tab_widget = AdvancedTabWidget()
         layout.addWidget(self.tab_widget)
         
         self.arpesHome = ARPESHome()
@@ -55,34 +35,30 @@ class ARPESMainWindow(QMainWindow):
         # # Create initial tab with the "Add Tab" button
         # self.create_main_tab()
         
-    '''     
-    # def create_main_tab(self):
-    #     """Create the main tab with the 'Add Tab' button"""
-    #     main_tab = QWidget()
-    #     layout = QVBoxLayout(main_tab)
+    def setup_shortcuts(self):
+        """Setup keyboard shortcuts for tab management"""
+        from PyQt6.QtGui import QShortcut, QKeySequence
         
-    #     add_tab_button = QPushButton("Add New Tab")
-    #     add_tab_button.clicked.connect(self.add_new_tab)
+        # Ctrl+T to add new tab
+        # new_tab_shortcut = QShortcut(QKeySequence("Ctrl+T"), self)
+        # new_tab_shortcut.activated.connect(self.add_new_tab)
         
-    #     layout.addWidget(QLabel("Main Tab - Click button to add new tabs"))
-    #     layout.addWidget(add_tab_button)
+        # Ctrl+W to close current tab
+        close_tab_shortcut = QShortcut(QKeySequence("Ctrl+W"), self)
+        close_tab_shortcut.activated.connect(self.close_current_tab)
         
-    #     self.tab_widget.addTab(main_tab, "Main")
+        # Ctrl+Shift+T to duplicate current tab
+        duplicate_shortcut = QShortcut(QKeySequence("Ctrl+Shift+T"), self)
+        duplicate_shortcut.activated.connect(self.duplicate_current_tab)
+        
     
-    # def add_new_tab(self):
-    #     """Add a new tab and switch to it"""
-    #     # Create new tab content
-    #     new_tab_content = TabContent(self.tab_counter)
-        
-    #     # Add tab to tab widget
-    #     tab_index = self.tab_widget.addTab(new_tab_content, f"Tab {self.tab_counter}")
-        
-    #     # Switch to the new tab
-    #     self.tab_widget.setCurrentIndex(tab_index)
-        
-    #     # Increment counter for next tab
-    #     self.tab_counter += 1
-    '''
+    def close_current_tab(self):
+        current_index = self.tab_widget.currentIndex()
+        self.tab_widget.close_tab(current_index)
+    
+    def duplicate_current_tab(self):
+        current_index = self.tab_widget.currentIndex()
+        self.tab_widget.duplicate_tab(current_index)
         
     def open_evm(self, result, energyArr, tifArr):
         #Todo: make sure we actually need to pass everything other than result
@@ -94,15 +70,15 @@ class ARPESMainWindow(QMainWindow):
         
         self.tab_counter += 1
         
-        new_EVM_tab.openMDC.connect(lambda resultData: self.open_distribution_curve("MDC", resultData))
-        new_EVM_tab.openEDC.connect(lambda resultData: self.open_distribution_curve("EDC", resultData))
+        new_EVM_tab.openMDC.connect(lambda resultData, extent: self.open_distribution_curve("MDC", resultData, extent))
+        new_EVM_tab.openEDC.connect(lambda resultData, extent: self.open_distribution_curve("EDC", resultData, extent))
         
         # self.w = EnergyVMomentum(path = dirPath, dat = datPath, tifArr = tifData, result = result)
         #w.result = result
         # self.w.show()
         
-    def open_distribution_curve(self, type, resultData):
-        new_distr_tab = DistCrve(type, resultData)
+    def open_distribution_curve(self, type, resultData, extent):
+        new_distr_tab = DistCrve(type, resultData, extentSpace = extent)
         
         tab_index = self.tab_widget.addTab(new_distr_tab, f"DistrCurve Tab {self.tab_counter}")
         

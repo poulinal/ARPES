@@ -1,8 +1,8 @@
 ### 2024 Alex Poulin
-from PyQt6.QtWidgets import QMainWindow, QLabel, QHBoxLayout, QVBoxLayout, QWidget, QSlider
-from PyQt6.QtWidgets import QFileDialog, QGraphicsView 
-from PyQt6.QtWidgets import QLineEdit, QPushButton, QComboBox, QCheckBox
-from PyQt6.QtCore import Qt, QDir, QPoint, pyqtSignal
+from PyQt6.QtWidgets import QMainWindow, QLabel, QHBoxLayout, QVBoxLayout, QWidget, QSlider, QSplitter
+from PyQt6.QtWidgets import QFileDialog, QGraphicsView, QMessageBox
+from PyQt6.QtWidgets import QLineEdit, QPushButton, QComboBox, QCheckBox, QDialog
+from PyQt6.QtCore import Qt, QDir, QPoint, pyqtSignal, QSettings
 # from src.tifConv import tiff_im, get_info, get_energies
 from src.energyVmomentum import EnergyVMomentum
 import numpy as np
@@ -17,8 +17,9 @@ from src.fileWork import filesWidget
 
 from src.widgets.lineCoordsWidget import lineCoordsWidget
 from src.widgets.sliderWidget import EnergySliderWidget
-from src.widgets.resetButtonWidget import ResetButton
 from src.widgets.saveWidget import saveWidget
+from src.widgets.manualEnergyInput import ManualEnergyInputWidget
+from src.widgets.filterOptionsWidget import FilterOptionsWidget
 
 np.set_printoptions(precision=4, suppress=True, threshold=5, linewidth=120)
 
@@ -35,10 +36,12 @@ class ARPESHome(QWidget):
         
         # self.setGeometry(100, 100, 1024, 824)  # Window size
         #window size where the first two are the position of the window and the last two are the size of the window (width, height)
+        self.settings = QSettings('DeLTA', 'ARDA')
+        # Load last directory
+        self.last_directory = self.settings.value('lastDirectory', '')
         
         #setup variables
         # self._plot_ref = [None, None] #first is main plot, second is line
-        self.gaussian = False
 
         # Set up the main window
         # self.setWindowTitle("ARDA - Alexander Poulin")
@@ -52,12 +55,30 @@ class ARPESHome(QWidget):
         
         #setup the UI
         self.setup_UI()
+        
         #finalize layout
+        layoutMainSplitter = QSplitter(Qt.Orientation.Horizontal)
+        layoutMainSplitter.setHandleWidth(1)  # Make it wider (default is ~3px)
+        layoutMainSplitter.setStyleSheet("""
+            QSplitter::handle {
+                background-color: #6a6a6a;
+                border: 1px solid #585757;
+            }
+            QSplitter::handle:hover {
+                background-color: #5dade2;
+            }
+            QSplitter::handle:pressed {
+                background-color: #2B2B2B;
+            }
+        """)
+
         self.layoutCol1.addLayout(self.layoutCol1Row1)
         self.layoutCol1.addLayout(self.layoutCol1Row2)
         self.layoutCol1Row2.addLayout(self.layoutCol1Row2Col1)
         self.layoutCol1.addLayout(self.layoutCol1Row3)
-        layoutRow1.addLayout(self.layoutCol1)
+        col1Widget = QWidget()
+        col1Widget.setLayout(self.layoutCol1)
+        layoutMainSplitter.addWidget(col1Widget)
         
         self.layoutCol2Col1.addLayout(self.layoutCol2Row1)
         self.layoutCol2Col1.addLayout(self.layoutCol2Row2)
@@ -66,7 +87,11 @@ class ARPESHome(QWidget):
         self.layoutCol2Col1.addLayout(self.layoutCol2Row5)
         self.layoutCol2Col1.addLayout(self.layoutCol2Row6)
         self.layoutCol2.addLayout(self.layoutCol2Col1)
-        layoutRow1.addLayout(self.layoutCol2)
+        col2Widget = QWidget()
+        col2Widget.setLayout(self.layoutCol2)
+        layoutMainSplitter.addWidget(col2Widget)
+        
+        layoutRow1.addWidget(layoutMainSplitter)
         # self.central_widget.setLayout(layoutRow1)
         self.setLayout(layoutRow1)
 
@@ -74,10 +99,22 @@ class ARPESHome(QWidget):
     def setup_UI(self):
         self.arpesDataObj = arpesData() #this is a class that holds the data for the arpes
         
+        #filter options toggle checkbox
+        self.filterOptionsToggle = QPushButton("▶ Show Filter Options")
+        self.filterOptionsToggle.setCheckable(True)
+        self.filterOptionsToggle.setChecked(False)
+        self.filterOptionsToggle.clicked.connect(self.toggleFilterOptions)
+        self.filterOptionsWidget = FilterOptionsWidget()
+        self.filterOptionsWidget.hide() #start hidden
+        self.filterOptionsWidget.gaussianFilter.connect(lambda state, sigma: self.setGaussianFilter(state, sigma))
+        self.layoutCol2Row2.addWidget(self.filterOptionsToggle)
+        self.layoutCol2Row2.addWidget(self.filterOptionsWidget)
         
         #Main figure
         self.arpesGraphFig = arpesGraph() #this is a widget class that holds the graph
-        self.arpesGraphFig.update_im(self.arpesDataObj.getCurrentTif(self.gaussian))
+        self.arpesGraphFig.update_im(self.arpesDataObj.getCurrentTif(self.filterOptionsWidget.getGaussianToggle(), self.filterOptionsWidget.getGaussianSigma()))
+        self.arpesGraphFig.setup_lincut_buttons()
+        self.arpesGraphFig.setup_draggableText()
         
         self.layoutCol1Row2Col1.addWidget(self.arpesGraphFig)
         
@@ -89,6 +126,7 @@ class ARPESHome(QWidget):
         
         #setup file manager widget
         self.filesWidget = filesWidget()
+        self.filesWidget.setFolderPathText(self.last_directory) #set the last directory
         self.layoutCol1Row1.addWidget(self.filesWidget)
         
         #setup submit button
@@ -101,17 +139,14 @@ class ARPESHome(QWidget):
         self.info = QLabel(self.filesWidget.getDatInfoFull())
         self.info.setStyleSheet("border: 1px solid white;")
         #current energy level
-        self.currentEnergy = QLabel(f"Current Energy Level: {self.arpesDataObj.getCurrentEnergy()[0]}")
+        self.currentEnergy = QCheckBox(f"Current Energy Level: {self.arpesDataObj.getCurrentEnergy()[0]}")
+        self.currentEnergy.stateChanged.connect(lambda checked: self.arpesGraphFig.toggleEnergyText(checked))
         self.setupCurEnergy(0)
         self.layoutCol2Row1.addWidget(self.info)
         self.layoutCol2Row2.addWidget(self.currentEnergy)
         
-        #gaussian toggle checkbox
-        self.gaussianToggle = QCheckBox("Apply Gaussian Filter")
-        self.gaussianToggle.stateChanged.connect(self.toggleGaussian)
-        self.layoutCol2Row2.addWidget(self.gaussianToggle)
         
-        
+        #setup line coords widget
         self.lineCoords = lineCoordsWidget()
         self.arpesGraphFig.mouse_graphpos_change.connect(lambda lastx, lasty: self.draw_line(lastx, lasty))
         self.arpesGraphFig.mouse_graphpos_start.connect(lambda startx, starty: self.lineCoords.setTexts(startX = startx, startY = starty))
@@ -154,37 +189,27 @@ class ARPESHome(QWidget):
         #create colormap selector
         self.colormap = QComboBox()
         self.colormap.addItems(plt.colormaps())
+        self.colormap.setCurrentText("grey")
         self.layoutCol2Row5.addWidget(self.colormap)
         self.colormap.currentTextChanged.connect(self.arpesGraphFig.change_colormap)
-        
-        #####setup save button
-        # save_button_com(self, "Save File")
-        # self.layoutCol2Row6.addWidget(self.save_button)
-        # self.save_button.clicked.connect(self.save_file)
-        
-        #setup resetbutton
-        self.resetButton = ResetButton()
-        self.resetButton.getButton().clicked.connect(self.reset_line)
-        self.layoutCol2Row6.addWidget(self.resetButton)
         
         
         # setup signals/connections
         self.filesWidget.update_dir.connect(self.send_dir_data)
         self.filesWidget.update_flatfield_dir.connect(self.send_flatfield_data)
     
+    
+    
+    
     def setupCurEnergy(self, num):
         self.arpesDataObj.setCurrentEnergy(num)
         self.currentEnergy.setText(f"Current Energy Level: {self.arpesDataObj.getCurrentEnergy()[0]}")
+        self.arpesGraphFig.setEnergyText(self.arpesDataObj.getCurrentEnergy()[0])
 
     #get everything from folder and setup data paths and image arrays 
     def send_dir_data(self):
         self.filesWidget.get_folder()
-        # print("got folder")
-        # print(f"tifNames: {self.filesWidget.getTifNames()}")
         self.filesWidget.process_folder_data()
-        # print(f"tifArr one: send_dir_data: {self.filesWidget.getTiffArr()[0]}")
-        # print(f"tifArr nonzero: send_dir_data: {[np.nonzero(self.filesWidget.getTiffArr()[0])]}")
-        # print(f"dat: {self.filesWidget.getDatPath()}")
         
         ###Todo setup warning for when tifnames are gathered but tifArr fails for whatever reason, i.e. no wifi to onedrive
         
@@ -198,41 +223,66 @@ class ARPESHome(QWidget):
             # print(f"tifArr from filesWidget before: {self.filesWidget.getTiffArr()}")
             self.arpesDataObj.setTifArr(self.filesWidget.getTiffArr())
             # print(f"tifArr from filesWidget after: {self.filesWidget.getTiffArr()}")
+        
+        elif self.filesWidget.getTiffArr() != []:
+            # print("No .DAT file found in directory... Manual Input then")
+            QMessageBox.information(self, "No .DAT file found", "No .DAT file found in directory... Please input energy values manually.")
+            self.arpesDataObj.setTifArr(self.filesWidget.getTiffArr())
+                        
+            manualEnergyInput = ManualEnergyInputWidget()
+            
+            while True:
+                energyInputDialogCode = manualEnergyInput.exec()
+                if energyInputDialogCode == QDialog.DialogCode.Accepted:  # Check if the dialog was accepted
+                    start, end, spacing = manualEnergyInput.result
+                    self.filesWidget.setEnergies(np.arange(start, end + spacing, spacing))
+                    
+                elif energyInputDialogCode == QDialog.DialogCode.Rejected:
+                    print("User cancelled manual energy input.")
+                    return
+                
+                if len(self.arpesDataObj.getTifData()) != len(self.filesWidget.getEnergies()):
+                    # print(f"len tifArr: {len(self.arpesDataObj.getTifData())}, len energies: {len(self.filesWidget.getEnergies())}")
+                    # return RuntimeError("Number of energies does not match number of tiff files!")
+                    QMessageBox.warning(self, "Invalid Input", f"Number of energies does not match number of tiff files! energyLength: {len(self.filesWidget.getEnergies())} tiffArrayLength: {len(self.arpesDataObj.getTifData())}. Please input again.")
+                else:
+                    break
+            
+            self.arpesDataObj.setEnergyArr(self.filesWidget.getEnergies())
         else:
             print("WARNING: empty dat path: send_dir_data \n \n \n")
         
-        self.arpesGraphFig.update_im(self.arpesDataObj.getCurrentTif(self.gaussian), set_default_clim=True)
+        
+        self.arpesGraphFig.update_im(self.arpesDataObj.getCurrentTif(self.filterOptionsWidget.getGaussianToggle(), self.filterOptionsWidget.getGaussianSigma()), set_default_clim=True)
         # update maxcontrast to be 100% of the max value in the current tif since set_default_clim will set to np.max; was thinking at first 150 but just 100 for now
         self.maxContrastInput.setText(str(self.arpesGraphFig.getMaxContrast()))
-        # print(f"send_dir_data: getCurrentTif: {self.arpesDataObj.getCurrentTif(self.gaussian)}")
-        self.energySlider.enable(len(self.filesWidget.getTifNames()) - 1)
-        # print(f"datinfoheader: {self.filesWidget.getDatInfoHeader()}")
+        self.energySlider.enable(len(self.filesWidget.getEnergies()) - 1)
         self.info.setText(self.filesWidget.getDatInfoHeader())   
         
+        self.slider_value_changed(0) #reset slider to 0 and update everything accordingly
         
-    #resets the line
-    def reset_line(self):
-        self.lineCoords.setTexts(startX="", startY="", lastX="", lastY="")
-        
-        self.lineCoords.setTexts("", "", "", "")
+        self.last_directory = self.filesWidget.getDirPath()
+        self.settings.setValue('lastDirectory', self.last_directory)
         
         
-        self.resetButton.disable()
-        
-        self.arpesGraphFig.setPlotRef(1, 0, changeX=True, changeY=True)
-        
-     #(will updates the images) according to the slider value
+    def toggleFilterOptions(self):
+        if self.filterOptionsToggle.isChecked():
+            self.filterOptionsToggle.setText("▼ Hide Filter Options")
+            # self.layoutCol2Row2.addWidget(self.lineCoords)
+            self.filterOptionsWidget.setVisible(True)
+        else:
+            self.filterOptionsToggle.setText("▶ Show Filter Options")
+            # self.layoutCol2Row2.removeWidget(self.lineCoords)
+            self.filterOptionsWidget.hide()
      
     def slider_value_changed(self, i):
         self.arpesDataObj.setCurrentEnergy(i)
-        # print(f"slider changed, current energy: {self.arpesDataObj.getCurrentEnergy()}")
-        # print(f"slider changed, current tif: {self.arpesDataObj.getCurrentTif(self.gaussian)}")
         self.currentEnergy.setText(f"Current Energy Level: {self.arpesDataObj.getCurrentEnergy()[0]}")
-        self.arpesGraphFig.update_im(self.arpesDataObj.getCurrentTif(self.gaussian))
+        self.arpesGraphFig.setEnergyText(self.arpesDataObj.getCurrentEnergy()[0])
+        self.arpesGraphFig.update_im(self.arpesDataObj.getCurrentTif(self.filterOptionsWidget.getGaussianToggle(), self.filterOptionsWidget.getGaussianSigma()))
         
-    def toggleGaussian(self):
-        self.gaussian = not self.gaussian
-        self.arpesGraphFig.update_im(self, self.arpesDataObj.getCurrentTif(self.gaussian))
+    def setGaussianFilter(self, bool, sigma=0.0):
+        self.arpesGraphFig.update_im(self.arpesDataObj.getCurrentTif(bool, sigma))
         
     def updateContrastMinMax(self, vmin = None, vmax = None, maxContrastText = None):
         if maxContrastText is None:
@@ -266,17 +316,19 @@ class ARPESHome(QWidget):
         if np.count_nonzero(self.arpesDataObj.getTifData()) == 0:
             print("WARNING... tif data not yet set or all data is zeroed... exiting")
             return None
+        if self.arpesGraphFig.getToggledLineCutMode() == False and self.arpesGraphFig.getToggledSegLineCutMode() == False:
+            return None
+        
         self.lineCoords.setTexts(lastX = lastx, lastY = lasty)
-        self.arpesGraphFig.make_line_across(*self.lineCoords.getPos())
+        
+        if self.arpesGraphFig.getToggledLineCutMode() == True:
+            self.arpesGraphFig.make_line_across(*self.lineCoords.getPos())
+        elif self.arpesGraphFig.getToggledSegLineCutMode() == True:
+            self.arpesGraphFig.make_line_partial(*self.lineCoords.getPos())
         self.arpesGraphFig.draw_graph()
     
-    #save the file
-    def save_file(self):
-        saveWidgetManger = saveWidget()
-        ArrayToVideo(self.arpesDataObj.getTifData(), self.arpesGraphFig.getCurrentVminVmax()[0], self.arpesGraphFig.getCurrentVminVmax()[1], self)
-    
     def create_evm(self):
-        resultEVMdata = self.arpesDataObj.interpl(*self.lineCoords.getPos(), vmin = self.arpesGraphFig.getCurrentVminVmax()[0], vmax = self.arpesGraphFig.getCurrentVminVmax()[1], posExtended = self.arpesGraphFig.getPosExtended())
+        resultEVMdata = self.arpesDataObj.interpl(*self.lineCoords.getPos(), vmin = self.arpesGraphFig.getCurrentVminVmax()[0], vmax = self.arpesGraphFig.getCurrentVminVmax()[1], posExtended = self.arpesGraphFig.getPosExtended(), distance = self.arpesGraphFig.getPosExtendedDistance())
         
         # print(f"nonzero resultEVMdata: {np.count_nonzero(resultEVMdata)}")
         

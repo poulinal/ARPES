@@ -22,14 +22,14 @@ class DistCrve(QWidget):
     """
     #result = np.zeros((50,50))
     
-    def __init__(self, type, curveResults):
+    def __init__(self, typePlot, curveResults, extentSpace = None):
         super().__init__()
         QGraphicsView.__init__(self, parent=None)
         #init variables
         # self.result = results
-        self.type = type
+        self.typePlot = typePlot
         self.curveResults = curveResults
-        print(f"curvereesults: {self.curveResults}, type: {type(self.curveResults)}")
+        # print(f"curvereesults: {self.curveResults}, type: {type(self.curveResults)}")
         self.gaussian = False
         # self.energiesLow = energiesLow
         # self.energiesHigh = energiesHigh
@@ -46,8 +46,11 @@ class DistCrve(QWidget):
         #     self.datPosEnd = (self.posEnd[0], remap(self.posEnd[1], 
         #                                     self.energiesLow, self.energiesHigh, 
         #                                     0, self.result.shape[0]))
+        self.extentSpace = extentSpace
+        print(f"DistCrve: extentSpace: {extentSpace}")
+        
         #set up window
-        self.setWindowTitle(type)
+        self.setWindowTitle(self.typePlot)
         self.layoutRow1 = QHBoxLayout()
         self.layoutCol1 = QVBoxLayout()
         self.layoutCol2 = QVBoxLayout()
@@ -65,8 +68,18 @@ class DistCrve(QWidget):
         
         #setupFigure
         # setup_figure_com(self)
-        self.distrGraphFig = arpesGraph()
-        self.distrGraphFig.update_line(*self.getDistrData(self.gaussian), colorline='blue')
+        self.distrGraphFig = arpesGraph(graphtype="basic")
+        x, y = zip(*self.getDistrData(self.gaussian))
+        
+        transformType = "None"
+        if self.typePlot == "EDC":
+            transformType = "y"
+            self.distrGraphFig.setLabels(xlabel="Energy (eV)", ylabel="Intensity (a.u.)", title="Energy Distribution Curve (EDC)")
+        elif self.typePlot == "MDC":
+            transformType = "x"
+            self.distrGraphFig.setLabels(xlabel="Pixels", ylabel="Intensity (a.u.)", title="Momentum Distribution Curve (MDC)")
+            
+        self.distrGraphFig.updateDCLine(x, y, colorline='blue', extentSpace=self.extentSpace, transform=transformType)
         self.layoutCol2.addWidget(self.distrGraphFig)
         
         #build
@@ -74,9 +87,7 @@ class DistCrve(QWidget):
         # self.build_DC()
         # self.configure_graph()
         
-    #configures the graph 
-    # def configure_graph(self):
-    #     configure_graph_com(self, self.type, 'Intensity', '')
+
         
     #get data
     def getDistrData(self, gaussian = False):
@@ -84,39 +95,8 @@ class DistCrve(QWidget):
             return gaussian_filter(self.curveResults, sigma=1.5)
         else:
             return self.curveResults
-    
-    #configures the type of distribution curve    
-    # def configure_type(self):
-    #     #get the points based on box selection
-    #     if self.datPosStart[0] is None or self.datPosStart[1] is None or self.datPosEnd[0] is None or self.datPosEnd[1] is None: #get full image
-    #         selectedBox = self.result
-    #     else:
-    #         selectedBox = self.result[int(min(self.datPosStart[1], self.datPosEnd[1])): int(max(self.datPosStart[1], self.datPosEnd[1])), 
-    #                                   int(min(self.datPosStart[0], self.datPosEnd[0])): int(max(self.datPosStart[0], self.datPosEnd[0]))]
-    #     #print(f"selectedBox: {selectedBox}")
-    #     #now integrate based on type
-    #     if self.type == "EDC": #EDC integration over x
-    #         newResult = np.zeros(shape = (1, selectedBox.shape[0]))
-    #         for row in selectedBox:
-    #             for col in range(len(newResult[0])):
-    #                 newResult[0][col] += row[col]
-                    
-    #     else: #MDC integration over y
-    #         newResult = np.zeros(shape = (1, selectedBox.shape[1]))
-    #         for row in range(selectedBox.shape[0]): #range of result height
-    #             newResult[0] += selectedBox[row]
-                
-    #     newResult = newResult.astype(float)
-    #     return newResult
-    
-    #saves the file
-    # def save_file(self):
-    #     save_file_com(self, self.newResult)
         
-    # #throws an error dialogue   
-    # def error_dialogue(self, title, message):
-    #     error_dialogue_com(self, title, message)
-    #     return False
-        
+    ##TODO: check tuple compatibilty
+    
          
         

@@ -1,10 +1,12 @@
 import os, sys
+from tkinter import dialog
 
 from PyQt6.QtWidgets import QFileDialog, QDialogButtonBox, QVBoxLayout, QPushButton, QCheckBox, QLineEdit, QHBoxLayout, QGroupBox, QFileDialog, QWidget
 from PyQt6.QtCore import QDir, pyqtSignal
 
 from src.widgets.getfileordir import getOpenFilesAndDirs
 from src.tifConv import tiff_im
+# from src.widgets.customFileDialogue import CustomFileDialog
 
 import numpy as np
 from PIL import Image
@@ -15,7 +17,7 @@ class filesWidget(QWidget):
     update_dir = pyqtSignal(str)
     update_flatfield_dir = pyqtSignal(str)
     
-    def __init__(self):
+    def __init__(self, lastDirectory = ''):
         super().__init__()
         #get the directory path
         #'''
@@ -99,38 +101,56 @@ class filesWidget(QWidget):
         #flatfieldButton.setEnabled(self.flatfield_correction)
         #flatfield_push_browse.setEnabled(True)
         return self.flatfield_correction
-            
+    
+    def setDirPath(self, path):
+        self.dir_path = path
+        
+    def setFolderPathText(self, text):
+        self.folder_path.setText(text)
+        
     def get_folder(self):
-        self.dir_path = self.folder_path.text()
+        self.setDirPath(self.folder_path.text())
         if not os.path.exists(self.dir_path):
             print("not a valid directory")
-            sys.exit()
+            # sys.exit()
+            return
             
         #get data from directory
         # self.tifNames= []
         # self.dat = ""
-        self.setTifNames = []
+        self.setTifNames([])
+        self.setDatPath("")
+        self.setEnergies([])
         
+        print(f"self.dir_path: {self.dir_path}")
         for f in os.listdir(self.dir_path):
-            if f.endswith('.TIF'):
+            if f.endswith('.TIF') or f.endswith('.tif'):
                 #print(f"tif: {f}")
                 self.tifNames.append(f)
             if f.endswith('.DAT'):
                 self.dat = f
             if f.endswith('.txt'):
                 self.energies = f
+        # print(f"tif: {self.tifNames}, dat: {self.dat}, energies: {self.energies}")
         self.tifNames = sorted(self.tifNames)
         #####should we check data to make sure images match with number in .DAT??
         #if len(tif) > 0: blah blah blah
-        self.tifNames.pop(0) #remove the first 0'th tif file which is just the sum of all
-        
+        # self.tifNames.pop(0) #remove the first 0'th tif file which is just the sum of all
+        # Remove any tif files that have "SUM" or "sum" in their name
+        filtered_tifNames = []
+        for name in self.tifNames:
+            if "SUM.tif" not in name and "sum.tif" not in name and "SUM.TIF" not in name and "sum.TIF" not in name:
+                filtered_tifNames.append(name)
+            else:
+                print(f"WARNING... Excluding {name} from tifNames due to 'SUM' in filename.")
+        self.tifNames = filtered_tifNames
         
         if self.flatfield_correction:
             self.flatFieldDirPath = self.flatfield_folder_path.text()
             
             #print(self.flatfield_path is not None and not self.flatfield_path == "")
             #print(self.flatfield_correction)
-        if (self.flatFieldDirPath is not "") and self.flatfield_correction:
+        if (self.flatFieldDirPath != "") and self.flatfield_correction:
             print("flatfield found")
             
             for f in os.listdir(self.flatfield_path):
@@ -151,6 +171,7 @@ class filesWidget(QWidget):
         return self.dir_path, self.dat, self.tifNames
         
     def process_folder_data(self):
+        # print("process_folder_data called with dir_path: ", self.getDirPath(), " and tifNames: ", self.getTifNames())
         self.setTiffArr(tiff_im(self.getDirPath(), self.getTifNames()))
         self.setFlatFieldArr(tiff_im(self.getFlatfieldDirPath, self.getFlatFieldNames()))
         
@@ -194,7 +215,7 @@ class filesWidget(QWidget):
                     break
                 #print(array)
         lastNum = energies[-1] # this is the last number which will be the number of tiff files in the DAT
-        self.energiesValArr = energies
+        self.setEnergies(energies)
         # print(f"energiesArr: {self.energiesValArr}")
         #print(lastNum)
         return energies
@@ -238,13 +259,18 @@ class filesWidget(QWidget):
                 
         
     def setEnergies(self, energyArr):
+        # print(f"setEnergies called with: {energyArr}")
         self.energiesValArr = energyArr
         
     def setTiffArr(self, tiffArr):
+        # print(f"setTiffArr called with array of length: {len(tiffArr)}")
         self.tifArr = tiffArr
         
     def setTifNames(self, tifNames):
         self.tifNames = tifNames
+        
+    def setDatPath(self, datPath):
+        self.dat = datPath
     
     def setFlatFieldArr(self, flatfieldTiffArr):
         self.flatFieldArr = flatfieldTiffArr
@@ -268,6 +294,10 @@ class filesWidget(QWidget):
         
         # infoHead = self.getDatInfo()
         infoHead = self.getDatInfoFull()
+        if isinstance(infoHead, str) and infoHead == "":
+            return "No Data Path Loaded..."
+        if not hasattr(infoHead, "to_string"):
+            return "No Data Path Loaded..."
         infoHead = infoHead.to_string(index=False, header=False)
         return infoHead
     

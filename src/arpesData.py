@@ -23,22 +23,20 @@ class arpesData(QObject):
     def getAllTifFiles(self):
         return self.tifArr
     
-    def getCurrentTif(self, applyGaussian = False):
+    def getCurrentTif(self, applyGaussian = False, sigma = 1.5):
         # print(f"currentTif self.energy: {self.energy}")
         # print(f"currentTif current TifArr: {self.tifArr}")
         if applyGaussian:
-            return gaussian_filter(self.tifArr[self.energy], sigma = 1.5)
+            return gaussian_filter(self.tifArr[self.energy], sigma = sigma)
         else:
             return self.tifArr[self.energy]
     
-    # def getDat(self):
-    #     return self.dat
-    
     def getCurrentEnergy(self):
-        # print(self.energy)
+        # print(f"size: {len(self.energyArr)} with energy: {self.energy}")
         try:
             return self.energyArr[self.energy], self.energy
         except RuntimeError as e:
+            print(f"ERROR in getCurrentEnergy: size: {len(self.energyArr)} with energy: {self.energy}")
             print(f"runtime error: {e}, where energy: {self.energy} and energyArr: {self.energyArr}")
             return RuntimeError(e)
             
@@ -53,8 +51,8 @@ class arpesData(QObject):
         Args:
             energy (int): integer index value that is between 0 and len(self.energyArr)
         """
-        # print(self.energyArr)
-        self.energy = energy if energy < len(self.energyArr) - 1 and energy >= 0 else RuntimeError("Set energy must be between 0 and len(self.energyArr) - 1")
+        # print(f"setting current energy: energy: {energy}, arr: {len(self.energyArr)}")
+        self.energy = energy if energy <= len(self.energyArr) - 1 and energy >= 0 else RuntimeError("Set energy must be between 0 and len(self.energyArr) - 1")
         
     def setEnergyArr(self, energyArr):
         self.energyArr = energyArr
@@ -69,15 +67,9 @@ class arpesData(QObject):
     
     
     def setTifArr(self, tifArr):
+        # print(f"setTifArr: len(tifArr) = {len(tifArr)}")
         self.tifArr = tifArr
         return self.tifArr
-    # def setDat(self, dat):
-    #     """Set the dat dir path
-
-    #     Args:
-    #         dat (String): path to the .dat file
-    #     """
-    #     self.dat = dat
         
         
     def get_flatfield_data(self, flatfieldArr):
@@ -100,11 +92,13 @@ class arpesData(QObject):
     
     
     #interpolate the line to go across the image
-    def interpl(self, startx, starty, lastx, lasty, posExtended, vmin = None, vmax = None): 
+    def interpl(self, startx, starty, lastx, lasty, posExtended, distance = None, vmin = None, vmax = None): 
         if (lastx is None or lasty is None or startx is None or starty is None):
             return
         
-        #print(f"posExtended: {posExtended}")
+        # print(f"posExtended: {posExtended}")
+        #print the start and end points for posExtended
+        print(f"start and end for posExtended: {posExtended[0][0]}, {posExtended[1][0]} and {posExtended[0][-1]}, {posExtended[1][-1]}")
         if (posExtended[0] is None or posExtended[1] is None):
             return #make sure there is a line to interpolate
         
@@ -113,14 +107,23 @@ class arpesData(QObject):
         #only return those points in the array which align with x_new and y_new
         #result = np.zeros(shape = (len(posExtended[0]), len(posExtended[1]))) #this will eventually be converted to image so should be height by width (height is number of images, width is distance of selection)
         #result = np.zeros(shape = (int(len(self.tifArr)), int(distance)))
-        result = np.zeros(shape = (int(len(self.tifArr)), self.tifArr[0].shape[0])) #note shape is row, col
+        print(distance)
+        resultColLength = int(distance)
+        resultRowLength = int(len(self.tifArr))
+        result = np.zeros(shape = (resultRowLength, resultColLength)) #note shape is row, col
+        
+        queryXindexes = np.linspace(posExtended[0][0], posExtended[0][-1], resultColLength, endpoint=False)
+        
+        print(f"queryXindexes: {queryXindexes}, length: {len((queryXindexes))}")
+        
         imIndex = 0
-        # print(f"posExtended: {posExtended}")
+        print(f"posExtended: {posExtended}, posExtended[0] shape: {posExtended[0].shape}, posExtended[1] shape: {posExtended[1].shape}")
         for tiffIm in self.tifArr:
-            for i in range(0, result.shape[1] - 1):
+            for index, indexValue in enumerate(queryXindexes):
                 #data point on the exact point (note posExtended[0] is x coordinates along line, posExtended[1] is y coordinates along line)
-                nearestXPix = int(posExtended[0][i])
-                nearestYPix = int(posExtended[1][i])
+                # print(f"index: {index}, indexValue: {indexValue}")
+                nearestXPix = int(posExtended[0][int(index)])
+                nearestYPix = int(posExtended[1][int(index)])
                 # print(f"nearestXPix: {nearestXPix}, nearestYPix: {nearestYPix}")
                 
                 #gamma = self.distanceWeightedAverage(nearestXPix, nearestYPix, posExtended[0], posExtended[1], 2)
@@ -142,11 +145,11 @@ class arpesData(QObject):
                     cluster_data += 1
                     
                     #diagonal left up and down
-                    if (nearestXPix > 0): #can go to up for cluster
+                    if (nearestYPix > 0): #can go to up for cluster
                         dataPoint += tiffIm[nearestXPix - 1][nearestYPix - 1]
                         cluster_data += 1
                         #dataPoint += self.distanceWeightedAverage(nearestXPix - 1, nearestYPix - 1, posExtended[0][i], posExtended[1][i], 2) * tiffIm[nearestXPix - 1][nearestYPix - 1]
-                    if (nearestXPix < self.tifArr[0].shape[0] - 1): #can go to down for cluster
+                    if (nearestYPix < self.tifArr[0].shape[0] - 1): #can go to down for cluster
                         dataPoint += tiffIm[nearestXPix - 1][nearestYPix + 1]
                         cluster_data += 1
                         #dataPoint += self.distanceWeightedAverage(nearestXPix - 1, nearestYPix + 1, posExtended[0][i], posExtended[1][i], 2) * tiffIm[nearestXPix - 1][nearestYPix + 1]
@@ -157,7 +160,7 @@ class arpesData(QObject):
                     #dataPoint += self.distanceWeightedAverage(nearestXPix + 1, nearestYPix, posExtended[0][i], posExtended[1][i], 2) * tiffIm[nearestXPix + 1][nearestYPix]
                     
                     #diagonal right up and down
-                    if (nearestXPix > 0): #can go to up for cluster
+                    if (nearestYPix > 0): #can go to up for cluster
                         dataPoint += tiffIm[nearestXPix + 1][nearestYPix - 1]
                         cluster_data += 1
                         #dataPoint += self.distanceWeightedAverage(nearestXPix + 1, nearestYPix - 1, posExtended[0][i], posExtended[1][i], 2) * tiffIm[nearestXPix + 1][nearestYPix - 1]
@@ -188,7 +191,7 @@ class arpesData(QObject):
                 #     print(f"new datapoint: {dataPointAvg}")
                 # print(f"dataPointAvg: {dataPointAvg}")
                 
-                result[imIndex][i] = dataPointAvg
+                result[imIndex][int(index)] = dataPointAvg
                 # end of for loop i (across image) iteration
             imIndex += 1
             #end of for loop for i (across image)

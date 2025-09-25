@@ -12,7 +12,7 @@ from subprocess import check_call as run
 from getopt import getopt, GetoptError 
 
 from src.widgets.QFileDialogFlatField import QFileDialogFlatFieldWidget
-from src.widgets.plottoolbar import matplotToolbar
+from src.widgets.plottoolbar import CustomToolbar
 
 #remaps to the energy range
 def remap(value, start1, stop1, start2, stop2):
@@ -95,7 +95,7 @@ def setup_figure_com(self):
     self.canvas = FigureCanvas(self.figure)
     # Create a Navigation Toolbar for zooming/panning
     #self.toolbar = NavigationToolbar(self.canvas, self)
-    self.toolbar = matplotToolbar(self.canvas, self)
+    self.toolbar = CustomToolbar(self.canvas, self)
         
     # Add toolbar and canvas to the layout
     #self.layout.addWidget(self.toolbar)
