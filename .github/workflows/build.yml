@@ -6,11 +6,14 @@ permissions:
 on:
   push:
     branches: 
-      - origin
-      - origin/main
-      - main
-      - 'feature/*'
-      - bigRedesignOOD
+      # - origin
+      # - origin/main
+      # - main
+      # - 'feature/*'
+      # - bigRedesignOOD
+      - featuretest*
+    tags:
+      - 'v*.*.*'  # For version releases
   pull_request:
     branches: [ main ]
   workflow_dispatch:  # Manual trigger
