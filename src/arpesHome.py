@@ -7,7 +7,6 @@ from PyQt6.QtCore import Qt, QDir, QPoint, pyqtSignal, QSettings
 import numpy as np
 import matplotlib.pyplot as plt
 
-from src.saveMov import ArrayToVideo
 from src.widgets.arpesGraph import arpesGraph
 from src.arpesData import arpesData
 from src.fileWork import filesWidget
