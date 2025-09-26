@@ -1,7 +1,7 @@
 ### 2024 Alex Poulin
 import numpy as np
 
-class ImageBuilder():
+class ImageRefBuilder():
     #build EM plot
     #other is the object class that is calling the function
     def build_image(self, other, im):

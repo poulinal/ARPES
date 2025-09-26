@@ -1,3 +1,4 @@
+### 2024 Alex Poulin
 from PyQt6.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QFileDialog
 
 from src.commonWidgets import error_dialogue_com, save_button_com, configure_graph_com

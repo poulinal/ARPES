@@ -1,20 +1,41 @@
 import os, sys
+from tkinter import dialog
 
 from PyQt6.QtWidgets import QFileDialog, QDialogButtonBox, QVBoxLayout, QPushButton, QCheckBox, QLineEdit, QHBoxLayout, QGroupBox, QFileDialog, QWidget
 from PyQt6.QtCore import QDir, pyqtSignal
 
 from src.widgets.getfileordir import getOpenFilesAndDirs
+from src.tifConv import tiff_im
+# from src.widgets.customFileDialogue import CustomFileDialog
 
-class files(QWidget):
+import numpy as np
+from PIL import Image
+from pandas import read_csv as pd
+
+class filesWidget(QWidget):
     
     update_dir = pyqtSignal(str)
     update_flatfield_dir = pyqtSignal(str)
     
-    def __init__(self):
+    def __init__(self, lastDirectory = ''):
         super().__init__()
         #get the directory path
         #'''
         self.setupWidget()
+        self.tifNames= []
+        self.tifArr = []
+        self.dat = ""
+        self.dir_path = ""
+        self.infoFull = ""
+        self.energies = []
+        self.energiesValArr = []
+        
+        self.flatFieldDirPath = ""
+        self.flatFieldNames = []
+        self.flatFieldArr = []
+        self.flatFieldDat = ""
+        self.flatFieldEnergiesArr = [] #will use same index as self.energies... #Todo these should be same length but handle when not
+        self.flatfield_correction = False
         
     #returns the path of the folder selected by the user
     def setupWidget(self):
@@ -80,80 +101,236 @@ class files(QWidget):
         #flatfieldButton.setEnabled(self.flatfield_correction)
         #flatfield_push_browse.setEnabled(True)
         return self.flatfield_correction
-            
+    
+    def setDirPath(self, path):
+        self.dir_path = path
+        
+    def setFolderPathText(self, text):
+        self.folder_path.setText(text)
+        
     def get_folder(self):
-        self.dir_path = self.folder_path.text()
+        self.setDirPath(self.folder_path.text())
         if not os.path.exists(self.dir_path):
             print("not a valid directory")
-            sys.exit()
-            #'''
-        #while testing:
-        #self.dir_path = '/Users/alexpoulin/Downloads/git/ARPES/exData/Sum'
-        #self.dir_path = '/Users/alexpoulin/Downloads/git/ARPES/Data from EQUAL/XPS data/Sum' #XPS data
-        
-        #june 24 2024
-        #self.dir_path = '/Users/alexpoulin/Library/CloudStorage/OneDrive-NortheasternUniversity/DeLTA Lab/data/06.24.2024/ARPES_MnTe_Ekin_sweep_240624_145559/APES_MnTe_Direct_FOV41p8_PE25_S1p0_240624_145559/Sum'
-        #self.iris_path = '/Users/alexpoulin/Library/CloudStorage/OneDrive-NortheasternUniversity/DeLTA Lab/data/06.24.2024/ARPES_MnTe_Ekin_sweep_240624_145559/APES_MnTe_Direct_FOV41p8_PE25_S1p0_defocus_240625_010121/Sum'
-
-        #june 20 2024
-        #self.dir_path = '/Users/alexpoulin/Library/CloudStorage/OneDrive-NortheasternUniversity/DeLTA Lab/data/06.20.2024/ARPES_MnTe_Direct_Ekinsweep_240620_151626/ARPES_MnTe_Direct_FOV4p0_240620_151626/Sum'
-        #self.iris_path = '/Users/alexpoulin/Library/CloudStorage/OneDrive-NortheasternUniversity/DeLTA Lab/data/06.20.2024/ARPES_MnTe_Direct_FOV4p0_flatfield_240621_120221/Sum'
-
-        #june 18 2024
-        #self.dir_path = '/Users/alexpoulin/Library/CloudStorage/OneDrive-NortheasternUniversity/DeLTA Lab/data/ARPES data 18th June24/ARPES_MnTe_Direct_with_large_blisters_Ekinsweep_240618_122202/ARPES_MnTe_Direct_FOV4p0_Iris_with large blisters_240618_122202/Sum'
-        #self.iris_path = '/Users/alexpoulin/Library/CloudStorage/OneDrive-NortheasternUniversity/DeLTA Lab/data/ARPES data 18th June24/ARPES_MnTe_Direct_Ekinsweep_240618_111423/ARPES_MnTe_Direct_FOV4p0_Iris_without large blisters_240618_111424/Sum'
-        
+            # sys.exit()
+            return
+            
         #get data from directory
-        self.tif = []
-        self.dat = ""
+        # self.tifNames= []
+        # self.dat = ""
+        self.setTifNames([])
+        self.setDatPath("")
+        self.setEnergies([])
         
+        print(f"self.dir_path: {self.dir_path}")
         for f in os.listdir(self.dir_path):
-            if f.endswith('.TIF'):
+            if f.endswith('.TIF') or f.endswith('.tif'):
                 #print(f"tif: {f}")
-                self.tif.append(f)
+                self.tifNames.append(f)
             if f.endswith('.DAT'):
                 self.dat = f
             if f.endswith('.txt'):
                 self.energies = f
-        self.tif = sorted(self.tif)
+        # print(f"tif: {self.tifNames}, dat: {self.dat}, energies: {self.energies}")
+        self.tifNames = sorted(self.tifNames)
         #####should we check data to make sure images match with number in .DAT??
         #if len(tif) > 0: blah blah blah
-        self.tif.pop(0) #remove the first 0'th tif file which is just the sum of all
+        # self.tifNames.pop(0) #remove the first 0'th tif file which is just the sum of all
+        # Remove any tif files that have "SUM" or "sum" in their name
+        filtered_tifNames = []
+        for name in self.tifNames:
+            if "SUM.tif" not in name and "sum.tif" not in name and "SUM.TIF" not in name and "sum.TIF" not in name:
+                filtered_tifNames.append(name)
+            else:
+                print(f"WARNING... Excluding {name} from tifNames due to 'SUM' in filename.")
+        self.tifNames = filtered_tifNames
         
-        
-        self.flatfield_path = None
         if self.flatfield_correction:
-            self.flatfield_path = self.flatfield_folder_path.text()
+            self.flatFieldDirPath = self.flatfield_folder_path.text()
             
             #print(self.flatfield_path is not None and not self.flatfield_path == "")
             #print(self.flatfield_correction)
-        if (self.flatfield_path is not None and not self.flatfield_path == "") and self.flatfield_correction:
+        if (self.flatFieldDirPath != "") and self.flatfield_correction:
             print("flatfield found")
             
-            self.flatfield_tif = []
             for f in os.listdir(self.flatfield_path):
                 #print(f"files: {f}")
                 if f.endswith('.TIF'):
                     #print(f"tif: {f}")
-                    self.flatfield_tif.append(f)
+                    self.flatFieldNames.append(f)
                 if f.endswith('.DAT'):
-                    self.flatfield_dat = f
+                    self.flatFieldDat = f
                 if f.endswith('.txt'):
                     self.flatfield_energies = f
-            self.flatfield_tif = sorted(self.flatfield_tif)
-            if len(self.flatfield_tif) > 1:
-                self.flatfield_tif.pop(0) #remove the first 0'th tif file which is just the sum of all
+            self.flatFieldNames = sorted(self.flatFieldNames)
+            if len(self.flatFieldNames) > 1:
+                self.flatFieldNames.pop(0) #remove the first 0'th tif file which is just the sum of all
             #print(f"flatfield tif: {self.flatfield_tif}")
             
         '''we should keep in mind that not all may have a sum file, so we should check for that'''
+        return self.dir_path, self.dat, self.tifNames
         
+    def process_folder_data(self):
+        # print("process_folder_data called with dir_path: ", self.getDirPath(), " and tifNames: ", self.getTifNames())
+        self.setTiffArr(tiff_im(self.getDirPath(), self.getTifNames()))
+        self.setFlatFieldArr(tiff_im(self.getFlatfieldDirPath, self.getFlatFieldNames()))
+        
+    # Converts all Tiff files in the form of an array
+    def tiff_im(self, path, tif):
+        """Based on the array of dir_tifs, generate all the necessary images into an array
+
+        Args:
+            path (String): dir_path to the base folder
+            tif (Array or List): array/list of the names of the tif files
+
+        Returns:
+            tifIm: an array which contains 2d images, so a 3d dataset
+        """
+        tifIm = []
+        for tiffName in tif: 
+            tiffFile = Image.open(path + "/" + tiffName) #open the tiff file ###Todo may need to change '/' to os path thing
+            imArray = np.array(tiffFile) #put the image into an array
+            tifIm.append(imArray) #saves the tiff image array
+        return tifIm
+            
+            
+    # Gets the energies from the tiff files
+    def get_energies_arr(self, path, dat): 
+        df = pd(path + "/" + dat, header=None, names=['col'])
+        energies = []
+        num = ""
+        for index, row in df.iterrows(): #this iterates through each row
+            value = row['col'] #row['col'] is a string of each column
+            
+            for element in value: #this iterates through the string on that row
+                
+                if element.isnumeric() or element == ".": #this goes until we hit the numbers (aka tiff file numbers)
+                    num = num + element #this will accumulate the numbers as long as the string element is numeric
+                    
+                else:
+                    if not num=="": #if there were no numbers, reset num and break
+                        energies.append(float(num)) #otherwise add it to the array
+                        #print(array)
+                    num = ""
+                    break
+                #print(array)
+        lastNum = energies[-1] # this is the last number which will be the number of tiff files in the DAT
+        self.setEnergies(energies)
+        # print(f"energiesArr: {self.energiesValArr}")
+        #print(lastNum)
+        return energies
+
+    #returns info from the dat file, FILE_ID, EXPERIMENT_NAME, MEASUREMENT_NAME, TIMESTAMP, INSTITUTION, SAMPLE
+    def get_info(self, path, dat):
+        df = pd(path + "/" + dat, header=None, names=['col'])
+        info = df.head(9)
+        # print(info)
+        '''
+        num = ""
+        for index, row in df.iterrows(): #this iterates through each row
+            value = row['col'] #row['col'] is a string of each column
+            
+            for element in value: #this iterates through the string on that row
+                
+                if element.isnumeric() or element == ".": #this goes until we hit the numbers (aka tiff file numbers)
+                    num = num + element #this will accumulate the numbers as long as the string element is numeric
+                    
+                else:
+                    if not num=="": #if there were no numbers, reset num and break
+                        info.append(float(num)) #otherwise add it to the array
+                        #print(array)
+                    num = ""
+                    break
+                #print(array)
+        lastNum = info[-1] # this is the last number which will be the number of tiff files in the DAT
+        '''
+        #print(lastNum)
+        return info
+    
+    def setInfoFromDat(self, path, dat):
+        # if self.dir_path == "":
+            # return "No data path loaded"
+        # self.infoFull = self.get_info(self.dir_path, self.dat) #first 9 lines
+        try:
+            df = pd(path + "/" + dat, header=None, names=['col'])
+            self.infoFull = df.head(9)
+        except:
+            self.infoFull = "No Data Path Loaded... Failed"
+                
+        
+    def setEnergies(self, energyArr):
+        # print(f"setEnergies called with: {energyArr}")
+        self.energiesValArr = energyArr
+        
+    def setTiffArr(self, tiffArr):
+        # print(f"setTiffArr called with array of length: {len(tiffArr)}")
+        self.tifArr = tiffArr
+        
+    def setTifNames(self, tifNames):
+        self.tifNames = tifNames
+        
+    def setDatPath(self, datPath):
+        self.dat = datPath
+    
+    def setFlatFieldArr(self, flatfieldTiffArr):
+        self.flatFieldArr = flatfieldTiffArr
+        return self.flatFieldArr
+      
+    def getDatInfoFull(self):
+        """Get the full dat info, currently first 9 lines
+
+        Returns:
+            _type_: _description_
+        """
+        return self.infoFull
+        
+    #get infohead
+    def getDatInfoHeader(self):
+        #print(f"infoHead: \n {infoHead}, \n {type(infoHead)}")
+        #FILE_ID, EXPERIMENT_NAME, MEASUREMENT_NAME, TIMESTAMP, INSTITUTION, SAMPLE
+        #columnsToInclude = ['FILE_ID*', 'EXPERIMENT_NAME*', 'MEASUREMENT_NAME*', 'TIMESTAMP*', 'INSTITUTION*', 'SAMPLE*']
+        #self.infoStr = infoHead.apply(lambda row: row.astype(str).values, axis=1) #this is an ndArray
+        #print(f"infoStr: \n {self.infoStr[0]}, \n {type(self.infoStr)}")
+        
+        # infoHead = self.getDatInfo()
+        infoHead = self.getDatInfoFull()
+        if isinstance(infoHead, str) and infoHead == "":
+            return "No Data Path Loaded..."
+        if not hasattr(infoHead, "to_string"):
+            return "No Data Path Loaded..."
+        infoHead = infoHead.to_string(index=False, header=False)
+        return infoHead
+    
+    def getEnergies(self):
+        return self.energiesValArr
+    
+    def getTiffArr(self):
+        return self.tifArr
+    
+    def getTifNames(self):
+        return self.tifNames
+    
+    def getDirPath(self):
+        return self.dir_path
+    
+    def getDatPath(self):
+        return self.dat
+    
+    def getFlatfieldInfo(self):
+        return self.flatFieldArr, self.flatFieldEnergiesArr
+    
+    def getFlatfieldDirPath(self):
+        return self.flatFieldDirPath
+    
+    def getFlatFieldNames(self):
+        return self.flatFieldNames
         
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle('File Manager')
         
-        self.file_widget = files()
+        self.file_widget = filesWidget()
 
         layout = QVBoxLayout()
         layout.addWidget(self.file_widget)

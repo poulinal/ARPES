@@ -1,3 +1,4 @@
+### 2024 Alex Poulin
 from PyQt6.QtWidgets import QFileDialog, QDialog, QStackedWidget, QListView, QLineEdit
 
 def getOpenFilesAndDirs(parent=None, caption='', directory='', 

@@ -1,3 +1,4 @@
+### 2024 Alex Poulin
 import sys
 from PyQt6.QtWidgets import QApplication, QFileDialog, QVBoxLayout, QPushButton, QDialog, QDialogButtonBox, QLabel, QCheckBox
 

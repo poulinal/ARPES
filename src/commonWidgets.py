@@ -12,7 +12,7 @@ from subprocess import check_call as run
 from getopt import getopt, GetoptError 
 
 from src.widgets.QFileDialogFlatField import QFileDialogFlatFieldWidget
-from src.widgets.plottoolbar import matplotToolbar
+from src.widgets.plottoolbar import CustomToolbar
 
 #remaps to the energy range
 def remap(value, start1, stop1, start2, stop2):
@@ -28,7 +28,7 @@ def rescale(original_array, new_min, new_max):
     resized_array = np.interp(original_array, (original_array.min(), original_array.max()), (new_min, new_max))
 
     # Print the resized array
-    print(resized_array)
+    # print(resized_array)
     return resized_array
 
 def save_button_com(self, text):
@@ -42,11 +42,11 @@ def save_file_com(self, text):
     file_name, _ = QFileDialog.getSaveFileName(self,"Save File","","Text Files(*.txt)")#,options = options)
     if file_name:
         f = open(file_name, 'w')
-        np.set_printoptions(threshold=np.inf)
+        # np.set_printoptions(threshold=np.inf)
         f.write(np.array_str(text))
         self.setWindowTitle(str(os.path.basename(file_name)) + " - ARPES Analysis")
         f.close()
-        np.set_printoptions()#revert todefautl
+        # np.set_printoptions()#revert todefautl
         return True
     else:
         return self.error_dialogue("Error", "File not saved")
@@ -95,7 +95,7 @@ def setup_figure_com(self):
     self.canvas = FigureCanvas(self.figure)
     # Create a Navigation Toolbar for zooming/panning
     #self.toolbar = NavigationToolbar(self.canvas, self)
-    self.toolbar = matplotToolbar(self.canvas, self)
+    self.toolbar = CustomToolbar(self.canvas, self)
         
     # Add toolbar and canvas to the layout
     #self.layout.addWidget(self.toolbar)
@@ -125,7 +125,7 @@ def reset_button_com(self):
 
 
 
-
+##lowkey who knows if this update features works
 RELEASE = 'master' # default release 
 SRC_DIR = "$HOME/.src" # checkout directory 
 UPDATE_CMD = ( # base command 

@@ -1,0 +1,62 @@
+name: Build Cross-Platform App
+
+permissions:
+  contents: write  # Need this for releases!
+
+on:
+  push:
+    branches: 
+      - main
+      - 'feature/*'
+      - bigRedesignOOD
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+        
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyqt6 numpy matplotlib pyinstaller scipy pillow pandas
+        # pip install -r requirements.txt
+    
+    - name: Build with PyInstaller
+      run: |
+        if [ "$RUNNER_OS" == "Windows" ]; then
+          pyinstaller --windowed --onefile --name ARDA.exe --icon=src/utilities/images/ARDA-temp-logo.ico --add-data "src/utilities/images:src/utilities/images" main.py
+        elif [ "$RUNNER_OS" == "macOS" ]; then
+          pyinstaller --windowed --onefile --name ARDA --icon=src/utilities/images/ARDA-temp-logo.icns --add-data "src/utilities/images:src/utilities/images" main.py
+        else
+          pyinstaller --onefile --name ARDA --add-data "src/utilities/images:src/utilities/images" main.py
+        fi
+      shell: bash
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.os }}-build
+        path: dist/*
+
+    - name: Upload to Release
+      if: startsWith(github.ref, 'refs/tags/')  # Only for tags!
+      uses: softprops/action-gh-release@v1
+      with:
+        files: dist/*
+        draft: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
