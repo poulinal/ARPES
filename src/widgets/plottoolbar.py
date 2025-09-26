@@ -1,5 +1,5 @@
 ### 2024 Alex Poulin
-from PyQt6.QtWidgets import QWidget, QCheckBox, QComboBox
+from PyQt6.QtWidgets import QWidget, QCheckBox, QComboBox, QVBoxLayout, QSizePolicy
 from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import pyqtSignal
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
@@ -29,6 +29,9 @@ class CustomToolbar(NavigationToolbar):
         super().__init__(canvas, parent)
         self.canvas = canvas
         
+        # self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        # self.setMinimumWidth(100)  # Set a reasonable minimum width
+    
         # Add separator before custom buttons
         self.addSeparator()
         
@@ -38,19 +41,21 @@ class CustomToolbar(NavigationToolbar):
     def add_custom_actions(self):
         """Add custom buttons to the toolbar"""
         
-        # Reset Plot button
-        reset_action = QAction("Reset", self)
-        reset_action.setToolTip("Reset plot to default view")
-        reset_action.triggered.connect(self.reset_plot)
-        self.addAction(reset_action)
+        # Get the default actions before clearing
+        default_actions = self.actions().copy()
+        # Clear all actions
+        self.clear()
         
-        # Export Data button
-        # export_action = QAction("Export", self)
-        # export_action.setToolTip("Export plot data to CSV")
-        # export_action.triggered.connect(self.export_data)
-        # self.addAction(export_action)
-        
-        # Add separator
+        # Add back the default actions (excluding the last separator if any)
+        # for action in default_actions:
+        for i in range(len(default_actions)):
+            action = default_actions[i]
+            # Only add actions except the very last one
+            if i < len(default_actions) - 2:
+                # okay so len(default_actions) - 1 is the normal behavior. However the original toolbar has an extra separator at the end for some reason which kept custom buttons to being forced into the overflow menu. So I skip the last action instead of adding all of them (including the end spacer).
+                # print(f"Re-adding action: {action.text()}")
+                self.addAction(action)
+        # Add separator after default actions
         self.addSeparator()
         
         
@@ -78,6 +83,14 @@ class CustomToolbar(NavigationToolbar):
         self.boxCutAction.triggered.connect(self.toggle_box_cut_mode)
         self.addAction(self.boxCutAction)
     
+    def add_reset_button(self):
+        """Add Reset button to the toolbar"""
+        reset_action = QAction("Reset", self)
+        reset_action.setToolTip("Reset plot to default view")
+        reset_action.triggered.connect(self.reset_plot)
+        self.addAction(reset_action)
+        self.addSeparator()
+        
     def reset_plot(self):
         """Reset plot to original state"""
         # self.canvas.reset_plot()

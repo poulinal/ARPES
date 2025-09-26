@@ -10,6 +10,7 @@ from src.widgets.draggableText import DraggableRotatedText
 class arpesGraph(QWidget):
     mouse_graphpos_change = pyqtSignal(float, float)
     mouse_graphpos_start = pyqtSignal(float, float)
+    resetCutsSignal = pyqtSignal()
     
     ##TODO: allow for nonlinear colorramps
     
@@ -129,6 +130,9 @@ class arpesGraph(QWidget):
         self.toolbar.add_boxcut_button()
         self.toolbar.boxCutModeToggled.connect(self.toggleBoxCutMode)
         
+    def setup_reset_button(self):
+        self.toolbar.add_reset_button()
+
     def setLabels(self, xlabel = None, ylabel = None, title = None):
         if xlabel is not None:
             self.ax.set_xlabel(xlabel, color='white')
@@ -298,35 +302,51 @@ class arpesGraph(QWidget):
         return self.figure.get_size_inches()
      
     def plot_mouse_click(self, e):
-        self.tracking = not self.tracking
+        # self.tracking = not self.tracking
+        # print("plot_mouse_click...")
         if e.inaxes:
             startx = e.xdata
             starty = e.ydata
-            self.mouse_graphpos_start.emit(startx, starty)
+            if not self.tracking: #tracking was false, now true
+                # print(f"Starting tracking at: {startx, starty}")
+                self.mouse_graphpos_start.emit(startx, starty)
+                self.tracking = True
+            else:
+                # print(f"Stopping tracking at: {startx, starty}")
+                self.mouse_graphpos_change.emit(startx, starty)
         
     def resetCuts(self):
-        if 'lineCut' in self._plot_ref.keys():
-            self._plot_ref['lineCut'].remove()
+        self.resetCutsSignal.emit()
+        if 'lineCut' in self._plot_ref.keys() and self._plot_ref['lineCut'] is not None and self._plot_ref['lineCut'] in self.ax.lines:
+            self._plot_ref['lineCut'].set_xdata([])
+            self._plot_ref['lineCut'].set_ydata([]) 
+            # self._plot_ref['lineCut'].remove()
             # del self._plot_ref['lineCut']
             self.canvas.draw()    
-        if 'rectangleTop' in self._plot_ref.keys():
-            self._plot_ref['rectangleTop'].remove()
+        if 'rectangleTop' in self._plot_ref.keys() and self._plot_ref['rectangleTop'] is not None and self._plot_ref['rectangleTop'] in self.ax.lines:
+            # self._plot_ref['rectangleTop'].remove()
+            self._plot_ref['rectangleTop'].set_xdata([])
+            self._plot_ref['rectangleTop'].set_ydata([])
             # del self._plot_ref['rectangleTop']
             self.canvas.draw()
-        if 'rectangleBottom' in self._plot_ref.keys():
-            self._plot_ref['rectangleBottom'].remove()
+        if 'rectangleBottom' in self._plot_ref.keys() and self._plot_ref['rectangleBottom'] is not None and self._plot_ref['rectangleBottom'] in self.ax.lines:
+            self._plot_ref['rectangleBottom'].set_xdata([])
+            self._plot_ref['rectangleBottom'].set_ydata([])
             # del self._plot_ref['rectangleBottom']
             self.canvas.draw()
-        if 'rectangleLeft' in self._plot_ref.keys():
-            self._plot_ref['rectangleLeft'].remove()
+        if 'rectangleLeft' in self._plot_ref.keys() and self._plot_ref['rectangleLeft'] is not None and self._plot_ref['rectangleLeft'] in self.ax.lines:
+            self._plot_ref['rectangleLeft'].set_xdata([])
+            self._plot_ref['rectangleLeft'].set_ydata([])
             # del self._plot_ref['rectangleLeft']
             self.canvas.draw()
-        if 'rectangleRight' in self._plot_ref.keys():
-            self._plot_ref['rectangleRight'].remove()
+        if 'rectangleRight' in self._plot_ref.keys() and self._plot_ref['rectangleRight'] is not None and self._plot_ref['rectangleRight'] in self.ax.lines:
+            self._plot_ref['rectangleRight'].set_xdata([])
+            self._plot_ref['rectangleRight'].set_ydata([])
             # del self._plot_ref['rectangleRight']
             self.canvas.draw()
          
     def plot_mouse_move(self, e):
+        # print(f"plot_mouse_move... tracking: {self.tracking}")
         if e.inaxes and self.tracking:
             #print("inaxes")
             pos = (e.xdata, e.ydata)
@@ -334,7 +354,7 @@ class arpesGraph(QWidget):
             self.lasty = e.ydata
             self.mouse_graphpos_change.emit(pos[0], pos[1]) ###Todo double check if this is value or relative x-y
             # self.make_line(self.getPos())
-            #print(f"lastx: {self.lastx}, lasty: {self.lasty}")
+            # print(f"lastx: {self.lastx}, lasty: {self.lasty}")
             
     #release stop tracking
     def plot_mouse_release(self, e):
@@ -402,7 +422,7 @@ class arpesGraph(QWidget):
         
         
     #draws the line  
-    def make_line_across(self, startx, starty, lastx, lasty):                                         
+    def make_line_across(self, startx, starty, lastx, lasty):                                       
         if (startx == "" or starty == "" or lastx == "" or lasty == ""):
             print(f"WARNING... empty string where {startx, starty, lastx, lasty}")
             return

@@ -48,7 +48,11 @@ This code is very preliminary. But the premise is to have two types, one that is
 **To Run**
 To run, make you way to the respository directory which should have a main.py in the home folder.
 then do '''./main.py'''
-Eventually I will build an executable that can simply be double tapped (and eventually automatically update).
+
+**To Build**
+Alternatively, you can build ARDA such that its 'compiles' into a single .exe file to run.
+You can either do '''python build.py''' (if you have pyinstaller installed)
+or you can do '''pyinstaller --windowed --onefile main.py''' though the first option is recommended
 
 
 

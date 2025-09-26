@@ -1,34 +1,30 @@
 ### 2024 Alex Poulin
 from PyQt6.QtWidgets import QMainWindow, QLabel, QHBoxLayout, QVBoxLayout, QWidget, QSlider, QSplitter
-from PyQt6.QtWidgets import QFileDialog, QGraphicsView, QMessageBox
+from PyQt6.QtWidgets import QFileDialog, QGraphicsView, QMessageBox, QSizePolicy
 from PyQt6.QtWidgets import QLineEdit, QPushButton, QComboBox, QCheckBox, QDialog
 from PyQt6.QtCore import Qt, QDir, QPoint, pyqtSignal, QSettings
-# from src.tifConv import tiff_im, get_info, get_energies
-from src.energyVmomentum import EnergyVMomentum
-import numpy as np
 
-from src.widgets.colorramp import ColorRampWidget
-from src.commonWidgets import reset_button_com, setup_figure_com, configure_graph_com, save_button_com
+import numpy as np
 import matplotlib.pyplot as plt
+
 from src.saveMov import ArrayToVideo
 from src.widgets.arpesGraph import arpesGraph
 from src.arpesData import arpesData
 from src.fileWork import filesWidget
 
+from src.widgets.colorramp import ColorRampWidget
 from src.widgets.lineCoordsWidget import lineCoordsWidget
 from src.widgets.sliderWidget import EnergySliderWidget
-from src.widgets.saveWidget import saveWidget
 from src.widgets.manualEnergyInput import ManualEnergyInputWidget
 from src.widgets.filterOptionsWidget import FilterOptionsWidget
+from PyQt6.QtWidgets import QScrollArea
 
-np.set_printoptions(precision=4, suppress=True, threshold=5, linewidth=120)
-
+# np.set_printoptions(precision=4, suppress=True, threshold=5, linewidth=120)
 
 ###Todo note that current i have duplicate tif/energy arrays in both filework and arpesdata... try to consolidate one way or the other... probabl consoldate data from filework into only arpesdata
 
 class ARPESHome(QWidget):
-    openEVM = pyqtSignal(object, object, object)  # Signal to open EVM with the result data
-    #resultEVMData, energiesArr, tifArr
+    openEVM = pyqtSignal(object, object, object)  # Signal to open EVM with the result data (resultEVMData, energiesArr, tifArr)
     
     def __init__(self):
         super().__init__()
@@ -39,25 +35,21 @@ class ARPESHome(QWidget):
         self.settings = QSettings('DeLTA', 'ARDA')
         # Load last directory
         self.last_directory = self.settings.value('lastDirectory', '')
+
+        # layoutCol = QVBoxLayout() #main horizontal layout containing everything
+        layoutRow1 = QHBoxLayout() #content horizontal layout; will contain the splitter
+
+        self.layoutCol1Row1, self.layoutCol1Row2, self.layoutCol1Row3 = QHBoxLayout(), QHBoxLayout(), QHBoxLayout() #left column rows (file browser, graph/energy slider, contrast slider)
         
-        #setup variables
-        # self._plot_ref = [None, None] #first is main plot, second is line
-
-        # Set up the main window
-        # self.setWindowTitle("ARDA - Alexander Poulin")
-        # self.central_widget = QWidget()
-        # self.setCentralWidget(self.central_widget)
-
-        layoutRow1, self.layoutCol1Row1, self.layoutCol1Row2, self.layoutCol1Row3 = QHBoxLayout(), QHBoxLayout(), QHBoxLayout(), QHBoxLayout()
-        self.layoutCol2Row1, self.layoutCol2Row2, self.layoutCol2Row3, self.layoutCol2Row4 = QHBoxLayout(), QHBoxLayout(), QHBoxLayout(), QHBoxLayout()
-        self.layoutCol2Row5, self.layoutCol2Row6 = QHBoxLayout(), QHBoxLayout()
-        self.layoutCol1, self.layoutCol1Row2Col1, self.layoutCol2, self.layoutCol2Col1 = QVBoxLayout(), QVBoxLayout(), QVBoxLayout(), QVBoxLayout()
+        self.layoutCol2Row1, self.layoutCol2Row2, self.layoutCol2Row3, self.layoutCol2Row4, self.layoutCol2Row5, self.layoutCol2Row6 = QHBoxLayout(), QHBoxLayout(), QHBoxLayout(), QHBoxLayout(), QHBoxLayout(), QHBoxLayout() #right column rows (info, energy, colormap, filterOptions, lineCoords, submit)
+        
+        self.layoutCol1, self.layoutCol2, self.layoutCol2Col1 = QVBoxLayout(), QVBoxLayout(), QVBoxLayout() #left and right columns and their subcolumns
         
         #setup the UI
         self.setup_UI()
         
         #finalize layout
-        layoutMainSplitter = QSplitter(Qt.Orientation.Horizontal)
+        layoutMainSplitter = QSplitter(Qt.Orientation.Horizontal) #separate main left and right columns
         layoutMainSplitter.setHandleWidth(1)  # Make it wider (default is ~3px)
         layoutMainSplitter.setStyleSheet("""
             QSplitter::handle {
@@ -72,11 +64,19 @@ class ARPESHome(QWidget):
             }
         """)
 
+        # Print ARPESHome widget size for debugging
+        print(f"ARPESHome size: {self.size()}")
+        total_width = self.size().width()
+        left_width = int(total_width * 7 / 12)
+        right_width = total_width - left_width
+        layoutMainSplitter.setSizes([left_width, right_width])
+        
+        
         self.layoutCol1.addLayout(self.layoutCol1Row1)
         self.layoutCol1.addLayout(self.layoutCol1Row2)
-        self.layoutCol1Row2.addLayout(self.layoutCol1Row2Col1)
         self.layoutCol1.addLayout(self.layoutCol1Row3)
         col1Widget = QWidget()
+        col1Widget.setMinimumWidth(100)   # size before splitter will collapse it
         col1Widget.setLayout(self.layoutCol1)
         layoutMainSplitter.addWidget(col1Widget)
         
@@ -88,11 +88,13 @@ class ARPESHome(QWidget):
         self.layoutCol2Col1.addLayout(self.layoutCol2Row6)
         self.layoutCol2.addLayout(self.layoutCol2Col1)
         col2Widget = QWidget()
+        col2Widget.setMinimumWidth(50)   # size before splitter will collapse it
         col2Widget.setLayout(self.layoutCol2)
         layoutMainSplitter.addWidget(col2Widget)
         
         layoutRow1.addWidget(layoutMainSplitter)
-        # self.central_widget.setLayout(layoutRow1)
+        
+        # layoutCol.addLayout(layoutRow1)
         self.setLayout(layoutRow1)
 
     #setup the basic ui elements
@@ -100,50 +102,77 @@ class ARPESHome(QWidget):
         self.arpesDataObj = arpesData() #this is a class that holds the data for the arpes
         
         #filter options toggle checkbox
+        layoutCol2Row4Col1 = QVBoxLayout() #sub layout for filter options toggle and filter options widget
         self.filterOptionsToggle = QPushButton("▶ Show Filter Options")
         self.filterOptionsToggle.setCheckable(True)
-        self.filterOptionsToggle.setChecked(False)
         self.filterOptionsToggle.clicked.connect(self.toggleFilterOptions)
         self.filterOptionsWidget = FilterOptionsWidget()
         self.filterOptionsWidget.hide() #start hidden
         self.filterOptionsWidget.gaussianFilter.connect(lambda state, sigma: self.setGaussianFilter(state, sigma))
-        self.layoutCol2Row2.addWidget(self.filterOptionsToggle)
-        self.layoutCol2Row2.addWidget(self.filterOptionsWidget)
+        layoutCol2Row4Col1.addWidget(self.filterOptionsToggle)
+        layoutCol2Row4Col1.addWidget(self.filterOptionsWidget)
+        self.layoutCol2Row4.addLayout(layoutCol2Row4Col1)
+        
+        layoutCol1Row2Col1 = QVBoxLayout() #sub layout for graph and energy slider
+        self.layoutCol1Row2.addLayout(layoutCol1Row2Col1) #graph/energy slider layout
         
         #Main figure
         self.arpesGraphFig = arpesGraph() #this is a widget class that holds the graph
         self.arpesGraphFig.update_im(self.arpesDataObj.getCurrentTif(self.filterOptionsWidget.getGaussianToggle(), self.filterOptionsWidget.getGaussianSigma()))
+        self.arpesGraphFig.setup_reset_button()
         self.arpesGraphFig.setup_lincut_buttons()
         self.arpesGraphFig.setup_draggableText()
-        
-        self.layoutCol1Row2Col1.addWidget(self.arpesGraphFig)
+        self.arpesGraphFig.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.arpesGraphFig.resetCutsSignal.connect(lambda: self.submitButton.setDisabled(True)) #disable submit button if cuts are reset
+        layoutCol1Row2Col1.addWidget(self.arpesGraphFig) 
         
         #setup energy slider
         self.energySlider = EnergySliderWidget()
-        self.layoutCol1Row2Col1.addWidget(self.energySlider)
-        self.energySlider.getSlider().valueChanged.connect(self.slider_value_changed) #on change, call slider_value_changed
-        
+        self.energySlider.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self.energySlider.setFixedHeight(40)
+        layoutCol1Row2Col1.addWidget(self.energySlider)
+        self.energySlider.getSlider().valueChanged.connect(self.slider_value_changed)
         
         #setup file manager widget
         self.filesWidget = filesWidget()
         self.filesWidget.setFolderPathText(self.last_directory) #set the last directory
+        # self.filesWidget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        # self.filesWidget.setMinimumHeight(100)
         self.layoutCol1Row1.addWidget(self.filesWidget)
         
         #setup submit button
-        submitButton = QPushButton("Submit")
-        submitButton.setFixedSize(200, 100)  # Set the fixed size of the button to create a square shape
-        submitButton.clicked.connect(lambda : self.create_evm())
-        self.layoutCol2Row5.addWidget(submitButton)
+        self.submitButton = QPushButton("Submit")
+        self.submitButton.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self.submitButton.setFixedHeight(40)  # Set preferred vertical size (height) for the button
+        self.submitButton.clicked.connect(lambda : self.create_evm())
+        self.submitButton.setDisabled(True) # start disabled until data is loaded
+        self.layoutCol2Row6.addWidget(self.submitButton)
         
         #setup infoHead
         self.info = QLabel(self.filesWidget.getDatInfoFull())
         self.info.setStyleSheet("border: 1px solid white;")
+        self.info.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self.info.setMinimumHeight(20)
+        # self.info.setWordWrap(True)
+
+        scrollArea = QScrollArea()
+        scrollArea.setWidgetResizable(True)
+        scrollArea.setWidget(self.info)
+        scrollArea.setMinimumHeight(60)
+        self.layoutCol2Row1.addWidget(scrollArea)
+        
         #current energy level
         self.currentEnergy = QCheckBox(f"Current Energy Level: {self.arpesDataObj.getCurrentEnergy()[0]}")
         self.currentEnergy.stateChanged.connect(lambda checked: self.arpesGraphFig.toggleEnergyText(checked))
         self.setupCurEnergy(0)
-        self.layoutCol2Row1.addWidget(self.info)
         self.layoutCol2Row2.addWidget(self.currentEnergy)
+        
+        #create colormap selector
+        self.colormap = QComboBox()
+        self.colormap.addItems(plt.colormaps())
+        self.colormap.setCurrentText("grey")
+        self.layoutCol2Row3.addWidget(self.colormap)
+        self.colormap.currentTextChanged.connect(self.arpesGraphFig.change_colormap)
         
         
         #setup line coords widget
@@ -151,16 +180,14 @@ class ARPESHome(QWidget):
         self.arpesGraphFig.mouse_graphpos_change.connect(lambda lastx, lasty: self.draw_line(lastx, lasty))
         self.arpesGraphFig.mouse_graphpos_start.connect(lambda startx, starty: self.lineCoords.setTexts(startX = startx, startY = starty))
         self.lineCoords.lineCoordsEdited.connect(lambda startx, starty, lastx, lasty: self.update_line_from_linecoords(startx, starty, lastx, lasty))
-
-        
-        
-        
-        contrastVLayout = QVBoxLayout()
-        contrastH1Layout = QHBoxLayout()
-        contrastH2Layout = QHBoxLayout()
+        self.lineCoords.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.lineCoords.setFixedHeight(50)
+        self.layoutCol2Row5.addWidget(self.lineCoords)
         
         # Create sliders
         self.contrast_slider = ColorRampWidget()
+        self.contrast_slider.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self.contrast_slider.setFixedHeight(60)
         
         # Create labels to display slider values
         self.label_vmin = QLabel("Left: 0.00")
@@ -172,26 +199,17 @@ class ARPESHome(QWidget):
         # Connect the slider signals
         self.contrast_slider.valueChanged.connect(lambda blackvalue, whitevalue: self.updateContrastMinMax(vmin=blackvalue, vmax=whitevalue, maxContrastText=self.maxContrastInput.text())) #the * unpacks the tuple
         self.maxContrastInput.editingFinished.connect(lambda: self.updateContrastMinMax(maxContrastText=self.maxContrastInput.text()))
-
-
-        # Add widgets to layout
-        contrastH1Layout.addWidget(self.contrast_slider)
-        contrastH1Layout.setStretch(0, 1)
-        contrastH2Layout.addWidget(self.label_vmin)
-        contrastH2Layout.addWidget(self.label_vmax)
-        contrastH2Layout.addWidget(self.maxContrastInput)
-        contrastVLayout.addLayout(contrastH1Layout)
-        contrastVLayout.addLayout(contrastH2Layout)
-        self.layoutCol2Row4.addLayout(contrastVLayout)
         
-        
-        
-        #create colormap selector
-        self.colormap = QComboBox()
-        self.colormap.addItems(plt.colormaps())
-        self.colormap.setCurrentText("grey")
-        self.layoutCol2Row5.addWidget(self.colormap)
-        self.colormap.currentTextChanged.connect(self.arpesGraphFig.change_colormap)
+        layoutCol2Row4Row1 = QHBoxLayout() #contains contrast slider
+        layoutCol2Row4Row2 = QHBoxLayout() #contains vmin, vmax, max contrast input
+        layoutCol2Row4Col1 = QVBoxLayout() #contains contrast slider and helper rows
+        layoutCol2Row4Row1.addWidget(self.contrast_slider)
+        layoutCol2Row4Row2.addWidget(self.label_vmin)
+        layoutCol2Row4Row2.addWidget(self.label_vmax)
+        layoutCol2Row4Row2.addWidget(self.maxContrastInput)
+        layoutCol2Row4Col1.addLayout(layoutCol2Row4Row1)
+        layoutCol2Row4Col1.addLayout(layoutCol2Row4Row2)
+        self.layoutCol1Row3.addLayout(layoutCol2Row4Col1)
         
         
         # setup signals/connections
@@ -257,7 +275,7 @@ class ARPESHome(QWidget):
         # update maxcontrast to be 100% of the max value in the current tif since set_default_clim will set to np.max; was thinking at first 150 but just 100 for now
         self.maxContrastInput.setText(str(self.arpesGraphFig.getMaxContrast()))
         self.energySlider.enable(len(self.filesWidget.getEnergies()) - 1)
-        self.info.setText(self.filesWidget.getDatInfoHeader())   
+        self.updateInfoHeaderText(self.filesWidget.getDatInfoHeader())   
         
         self.slider_value_changed(0) #reset slider to 0 and update everything accordingly
         
@@ -275,6 +293,10 @@ class ARPESHome(QWidget):
             # self.layoutCol2Row2.removeWidget(self.lineCoords)
             self.filterOptionsWidget.hide()
      
+    def updateInfoHeaderText(self, text):
+        self.info.setText(text)
+        self.info.adjustSize()  # Update size to fit new content if needed
+        
     def slider_value_changed(self, i):
         self.arpesDataObj.setCurrentEnergy(i)
         self.currentEnergy.setText(f"Current Energy Level: {self.arpesDataObj.getCurrentEnergy()[0]}")
@@ -313,10 +335,11 @@ class ARPESHome(QWidget):
         self.arpesGraphFig.draw_graph()
         
     def draw_line(self, lastx, lasty):
-        if np.count_nonzero(self.arpesDataObj.getTifData()) == 0:
+        if np.count_nonzero(self.arpesDataObj.getTifData()) == 0: #check if tif data is empty
             print("WARNING... tif data not yet set or all data is zeroed... exiting")
             return None
-        if self.arpesGraphFig.getToggledLineCutMode() == False and self.arpesGraphFig.getToggledSegLineCutMode() == False:
+        if self.arpesGraphFig.getToggledLineCutMode() == False and self.arpesGraphFig.getToggledSegLineCutMode() == False: #only draw line if one of the modes is toggled
+            print("WARNING... neither linecut mode is toggled... exiting")
             return None
         
         self.lineCoords.setTexts(lastX = lastx, lastY = lasty)
@@ -325,6 +348,13 @@ class ARPESHome(QWidget):
             self.arpesGraphFig.make_line_across(*self.lineCoords.getPos())
         elif self.arpesGraphFig.getToggledSegLineCutMode() == True:
             self.arpesGraphFig.make_line_partial(*self.lineCoords.getPos())
+        else:
+            print("ERROR: draw_line called but neither linecut mode is toggled... exiting")
+            self.submitButton.setDisabled(True) # disable submit button if error
+            return None
+        # allow for submission now that line is drawn
+        self.submitButton.setDisabled(False)
+        
         self.arpesGraphFig.draw_graph()
     
     def create_evm(self):

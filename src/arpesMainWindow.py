@@ -6,6 +6,9 @@ from src.energyVmomentum import EnergyVMomentum
 from src.distributionCurve import DistCrve
 from src.widgets.advancedTabWidget import AdvancedTabWidget
 
+from PyQt6.QtGui import QShortcut, QKeySequence
+from PyQt6.QtGui import QGuiApplication
+
 class ARPESMainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -14,7 +17,9 @@ class ARPESMainWindow(QMainWindow):
     
     def init_ui(self):
         self.setWindowTitle("ARDA - Alexander Poulin")
-        self.setGeometry(100, 100, 1024, 824)  # Window size
+        # self.setGeometry(100, 100, 1024, 824)  # Window size
+        screen_geometry = QGuiApplication.primaryScreen().geometry()
+        self.setGeometry(0, 0, int(screen_geometry.width() * 0.6), screen_geometry.height() - 50)
         
         # Create central widget and tab widget
         central_widget = QWidget()
@@ -37,7 +42,6 @@ class ARPESMainWindow(QMainWindow):
         
     def setup_shortcuts(self):
         """Setup keyboard shortcuts for tab management"""
-        from PyQt6.QtGui import QShortcut, QKeySequence
         
         # Ctrl+T to add new tab
         # new_tab_shortcut = QShortcut(QKeySequence("Ctrl+T"), self)

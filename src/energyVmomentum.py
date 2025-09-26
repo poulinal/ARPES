@@ -25,25 +25,10 @@ class EnergyVMomentum(QWidget):
         super().__init__()
         QGraphicsView.__init__(self, parent=None)
         
-        # self.setFixedSize(400, 300)  # Width: 400px, Height: 300px
-        
-        
         #setup variables
         self.evmData = results
         print(f"nonzero evmdata: {np.count_nonzero(self.evmData)}")
-        # self.startx = None
-        # self.starty = None
-        # self.lastx = None
-        # self.lasty = None
-        # self.datax = None
-        # self.datay = None
-        # self.dataLastx = None
-        # self.dataLasty = None
-        # self.tracking = False
-        # self.path = path
         self.tifArr = tifArr
-        # self.dat = dat
-        #self.info = info
         self.energies = energies
         self.energiesLow = self.energies[0]
         self.energiesHigh = self.energies[len(self.energies)-1]
@@ -54,19 +39,6 @@ class EnergyVMomentum(QWidget):
         ##TODO not necessarily linearly spaced, need to fix this later
         self.extentXarr = np.linspace(self.extent[0], self.extent[1], self.evmData.shape[1])
         self.extentYarr = np.linspace(self.extent[2], self.extent[3], self.evmData.shape[0])
-        print(f"extentXarr: {self.extentXarr}")
-        print(f"extentYarr: {self.extentYarr}")
-        
-        
-        # self.maxcontrast = 10000
-        # self.vmin = None
-        # self.vmax = None
-        #self._plot_ref = [None, None]
-        
-        # We need to store a reference to the plotted line
-        # somewhere, so we can apply the new data to it.
-        # self._plot_ref = [None, None, None, None]
-        # print(f"self._plot_ref: {self._plot_ref}")
         
         #setup window
         # self.setWindowTitle("Energy vs Momentum Plot - Alexander Poulin")
@@ -105,10 +77,11 @@ class EnergyVMomentum(QWidget):
         self.EVMGraphFig = arpesGraph()
         print(f"self.evmData.shape: {self.getEVMData(self.gaussian).shape}")
         print(f"EVM initial plot")
+        self.EVMGraphFig.setup_reset_button()
         self.EVMGraphFig.setup_boxcut_button()
         self.EVMGraphFig.update_im(im = self.getEVMData(self.gaussian), set_default_clim=True, extent = self.extent)
-        
-        
+        self.EVMGraphFig.resetCutsSignal.connect(lambda: [self.intXButton.setEnabled(False), self.intYButton.setEnabled(False)])
+
         self.layoutCol2.addWidget(self.EVMGraphFig, stretch=1)
         
         self.lineCoords = lineCoordsWidget()
@@ -120,6 +93,9 @@ class EnergyVMomentum(QWidget):
         self.intYButton = QPushButton("Int over Y")
         self.intYButton.setFixedSize(100, 50)  # Set the fixed size of the button to create a square shape
         self.layoutCol1.addWidget(self.intYButton)
+        
+        self.intXButton.setEnabled(False)
+        self.intYButton.setEnabled(False)
         
         self.intXButton.clicked.connect(self.create_MDC)
         self.intYButton.clicked.connect(self.create_EDC)
@@ -190,6 +166,13 @@ class EnergyVMomentum(QWidget):
             self.lineCoords.setLastTexts(lastX = lastx, lastY = lasty)
             # startx, starty, lastx, lasty = self.lineCoords.getPos()
             self.EVMGraphFig.create_area(*self.lineCoords.getPos())
+        else:
+            print("draw_box: not in box cut mode, disabling int buttons")
+            self.intXButton.setEnabled(False)
+            self.intYButton.setEnabled(False)
+            return
+        self.intXButton.setEnabled(True)
+        self.intYButton.setEnabled(True)
 
     def updateContrastMinMax(self, vmin = None, vmax = None, maxContrastText = None):
         if maxContrastText is None:
