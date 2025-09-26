@@ -6,6 +6,8 @@ permissions:
 on:
   push:
     branches: 
+      - origin
+      - origin/main
       - main
       - 'feature/*'
       - bigRedesignOOD
