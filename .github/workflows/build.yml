@@ -1,7 +1,7 @@
 name: Build Cross-Platform App
 
 permissions:
-  contents: write  # Need this for releases!
+  contents: write  # Need this for releases! 
 
 on:
   push:
