@@ -52,7 +52,7 @@ then do '''./main.py'''
 **To Build**
 Alternatively, you can build ARDA such that its 'compiles' into a single .exe file to run.
 You can either do '''python build.py''' (if you have pyinstaller installed)
-or you can do '''pyinstaller --windowed --onefile main.py''' though the first option is recommended
+or you can do '''pyinstaller --windowed --onefile main.py''' though the first option is recommended.
 
 
 
