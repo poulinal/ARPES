@@ -1,5 +1,8 @@
 name: Build Cross-Platform App
 
+permissions:
+  contents: write  # Need this for releases!
+
 on:
   push:
     branches: 
@@ -50,6 +53,7 @@ jobs:
         path: dist/*
 
     - name: Upload to Release
+      if: startsWith(github.ref, 'refs/tags/')  # Only for tags!
       uses: softprops/action-gh-release@v1
       with:
         files: dist/*
