@@ -2,7 +2,10 @@ name: Build Cross-Platform App
 
 on:
   push:
-    branches: [ main ]
+    branches: 
+      - main
+      - 'feature/*'
+      - bigRedesignOOD
   pull_request:
     branches: [ main ]
   workflow_dispatch:  # Manual trigger
@@ -21,7 +24,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.11'
+        python-version: '3.12'
     
     - name: Install dependencies
       run: |
@@ -50,5 +53,6 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         files: dist/*
+        draft: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

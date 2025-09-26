@@ -10,7 +10,6 @@ from src.xps import XPSGUI
 import os
 import sys
 from pathlib import Path
-from PyQt6.QtWidgets import QMessageBox
 
 """ Purpose of this file is to create the home page of the application. It is simply to distinguish between ARPES and XPS. 
     The user can click on the ARPES button to go to the ARPES page, or the XPS button to go to the XPS page. """
